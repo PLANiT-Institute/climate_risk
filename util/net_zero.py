@@ -4,6 +4,92 @@ import pulp
 from typing import Dict, List, Tuple, Optional
 
 
+class NetZeroPathway:
+    """
+    Simple Net-Zero pathway calculator using linear emission reduction.
+    
+    This class calculates emission reduction targets using a linear pathway
+    from baseline emissions to net-zero by the target year.
+    """
+    
+    def __init__(self, facilities_xlsx: str, approach: str = "linear", 
+                 target_year: int = 2050, base_year: int = 2024):
+        """
+        Initialize the Net-Zero pathway calculator.
+        
+        Args:
+            facilities_xlsx: Path to Excel with facility data.
+            approach: Approach to use ("linear" or "absolute").
+            target_year: Year to reach net-zero (default: 2050).
+            base_year: Base year for emissions (default: 2024).
+        """
+        self.facilities_xlsx = facilities_xlsx
+        self.approach = approach
+        self.target_year = target_year
+        self.base_year = base_year
+        
+        # Data containers
+        self.df_fac = None
+        self.pathway_results = None
+        
+        # Load data
+        self.load_data()
+    
+    def load_data(self):
+        """Load facility data."""
+        try:
+            self.df_fac = pd.read_excel(self.facilities_xlsx)
+            required_columns = ['facility_id', 'baseline_emissions_2024']
+            missing = [col for col in required_columns if col not in self.df_fac.columns]
+            if missing:
+                raise ValueError(f"Facilities data missing required columns: {missing}")
+        except Exception as e:
+            raise IOError(f"Error loading facility data: {str(e)}")
+    
+    def calculate_linear_pathway(self):
+        """Calculate linear emission reduction pathway."""
+        years = range(2025, self.target_year + 1)
+        total_years = self.target_year - 2024
+        
+        results = []
+        
+        for _, facility in self.df_fac.iterrows():
+            facility_id = facility['facility_id']
+            baseline_emissions = facility['baseline_emissions_2024']
+            
+            for year in years:
+                # Linear reduction: reduce by equal percentage each year
+                years_elapsed = year - 2024
+                reduction_factor = years_elapsed / total_years
+                
+                if self.approach == "linear":
+                    # Linear reduction to zero
+                    target_emissions = baseline_emissions * (1 - reduction_factor)
+                elif self.approach == "absolute":
+                    # Absolute reduction by fixed amount each year
+                    annual_reduction = baseline_emissions / total_years
+                    target_emissions = max(0, baseline_emissions - (annual_reduction * years_elapsed))
+                else:
+                    # Default to linear
+                    target_emissions = baseline_emissions * (1 - reduction_factor)
+                
+                results.append({
+                    'facility_id': facility_id,
+                    'year': year,
+                    'baseline_emissions_2024': baseline_emissions,
+                    'net_zero_target_emissions': target_emissions,
+                    'reduction_from_baseline': baseline_emissions - target_emissions,
+                    'reduction_percentage': (baseline_emissions - target_emissions) / baseline_emissions * 100
+                })
+        
+        self.pathway_results = pd.DataFrame(results)
+        return self.pathway_results
+    
+    def run(self):
+        """Run the net-zero pathway calculation."""
+        return self.calculate_linear_pathway()
+
+
 class OptimalEmissionPathway:
     """
     Calculates cost-optimal emission reduction pathways using linear programming.

@@ -313,3 +313,4 @@ class TransitionRisk:
             self.export_results(export_path)
             
         return self.transition_results
+    
