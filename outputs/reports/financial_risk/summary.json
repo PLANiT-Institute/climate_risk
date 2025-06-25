@@ -1,0 +1,23 @@
+{
+  "transition_risk": {
+    "NDC": {
+      "total_cost": 35936438.11099912,
+      "average_annual_cost": 8984109.52774978,
+      "max_annual_cost": 35483726.11099912,
+      "max_cost_year": 2050,
+      "yearly_costs": {
+        "2025": 0.0,
+        "2026": 7679.999999998603,
+        "2027": 445031.99999999884,
+        "2050": 35483726.11099912
+      }
+    }
+  },
+  "physical_risk": {
+    "base": {
+      "total_annual_loss": 635000.0,
+      "average_facility_loss": 211666.66666666666,
+      "max_facility_loss": 600000.0
+    }
+  }
+}
