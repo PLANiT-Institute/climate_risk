@@ -1,0 +1,41 @@
+facility_id,country,hazard_type,risk_score,risk_level,potential_loss_usd,probability,asset_value_usd,sector,mitigation_cost_usd,mitigation_description,roi_mitigation
+FAC_013,Japan,Earthquake,0.8856217365389043,CRITICAL,1043878302.4232879,1.0,1178695440.0,chemicals,141443452.8,"Seismic retrofitting, flexible connections, base isolation",6.380181137824202
+FAC_018,Japan,Earthquake,0.8370900833227446,CRITICAL,836447594.9194522,1.0,999232474.0,real_estate,119907896.88,"Seismic retrofitting, flexible connections, base isolation",5.975750694356205
+FAC_016,Japan,Earthquake,0.7766814919316568,CRITICAL,2246741382.423699,0.9,2603470361.0,automotive,208277628.88,"Seismic retrofitting, flexible connections, base isolation",9.787242943495233
+FAC_014,Japan,Earthquake,0.7686678383630482,CRITICAL,974430772.619178,0.9,1140918940.0,chemicals,91273515.2,"Seismic retrofitting, flexible connections, base isolation",9.67594219948678
+FAC_005,Japan,Earthquake,0.745913435944855,CRITICAL,3504902627.7534256,0.9,4228925520.0,utilities,338314041.6,"Seismic retrofitting, flexible connections, base isolation",9.359908832567431
+FAC_004,Japan,Earthquake,0.7412536496901733,CRITICAL,5325867669.350137,0.9,6466451672.0,utilities,517316133.76,"Seismic retrofitting, flexible connections, base isolation",9.295189579030184
+FAC_015,USA,Wildfire,0.6042634721212403,HIGH,2986742997.198082,0.65,3212808713.0,automotive,192768522.78,"Fire-resistant landscaping, sprinkler systems, firebreaks",14.493935182595903
+FAC_002,USA,Wildfire,0.5814800158479158,HIGH,4181037816.6193156,0.65,4673719658.0,oil_gas,280423179.48,"Fire-resistant landscaping, sprinkler systems, firebreaks",13.909743996100401
+FAC_010,USA,Wildfire,0.5757755572065983,HIGH,1447672331.1254797,0.65,1634294828.0,cement,98057689.68,"Fire-resistant landscaping, sprinkler systems, firebreaks",13.763475825810213
+FAC_011,USA,Wildfire,0.5741535382880212,HIGH,903804346.1334246,0.65,1023198127.0,cement,61391887.62,"Fire-resistant landscaping, sprinkler systems, firebreaks",13.721885597128749
+FAC_013,Japan,Storm,0.48062173653890417,MEDIUM,566506649.2232877,1.0,1178695440.0,chemicals,44201079.0,"Structural reinforcement, storm shutters, emergency generators",11.816579641037444
+FAC_018,Japan,Storm,0.4320900833227444,MEDIUM,431758442.94945204,1.0,999232474.0,real_estate,37471217.775000006,"Structural reinforcement, storm shutters, emergency generators",10.52240222193985
+FAC_016,Japan,Storm,0.36638354838369486,MEDIUM,1192335886.2186987,0.8,2603470361.0,automotive,65086759.025000006,"Structural reinforcement, storm shutters, emergency generators",17.31917741918474
+FAC_014,Japan,Storm,0.359260300767154,MEDIUM,512358601.9191781,0.8,1140918940.0,chemicals,28522973.5,"Structural reinforcement, storm shutters, emergency generators",16.9630150383577
+FAC_015,USA,Storm,0.3507161665454884,MEDIUM,1444594814.9580822,0.78,3212808713.0,automotive,120480326.73750001,"Structural reinforcement, storm shutters, emergency generators",10.990296292153447
+FAC_005,Japan,Storm,0.3390341652843155,MEDIUM,1792187792.1534247,0.8,4228925520.0,utilities,105723138.0,"Structural reinforcement, storm shutters, emergency generators",15.951708264215775
+FAC_004,Japan,Storm,0.33489213305793186,MEDIUM,2706954742.1901374,0.8,6466451672.0,utilities,161661291.8,"Structural reinforcement, storm shutters, emergency generators",15.744606652896591
+FAC_002,USA,Storm,0.32337601901749874,MEDIUM,1937652380.779315,0.78,4673719658.0,oil_gas,175264487.175,"Structural reinforcement, storm shutters, emergency generators",10.05559039376064
+FAC_010,USA,Storm,0.3165306686479179,MEDIUM,663210813.6854794,0.78,1634294828.0,cement,61286056.050000004,"Structural reinforcement, storm shutters, emergency generators",9.821561321296338
+FAC_011,USA,Storm,0.3145842459456254,MEDIUM,412669245.17342466,0.78,1023198127.0,cement,38369929.7625,"Structural reinforcement, storm shutters, emergency generators",9.755016955405996
+FAC_019,France,Wildfire,0.2506171405705648,LOW,818270873.5150685,0.4,1306009432.0,real_estate,52240377.28,"Fire-resistant landscaping, sprinkler systems, firebreaks",14.663571285660296
+FAC_003,UK,Storm,0.18594900764081673,LOW,768649346.6825342,0.7,2893559635.0,oil_gas,72338990.875,"Structural reinforcement, storm shutters, emergency generators",9.625657579475243
+FAC_020,UK,Storm,0.16343433343139174,LOW,12567240055.858562,0.7,53826315771.0,financial,1345657894.275,"Structural reinforcement, storm shutters, emergency generators",8.339104767508099
+FAC_012,Germany,Storm,0.15723032562406536,LOW,675521847.3435616,0.65,2792649567.0,chemicals,104724358.76249999,"Structural reinforcement, storm shutters, emergency generators",5.4504748973975525
+FAC_001,Germany,Storm,0.15300142768256964,LOW,990779045.1061646,0.65,4209152745.0,oil_gas,157843227.9375,"Structural reinforcement, storm shutters, emergency generators",5.276981648515678
+FAC_006,China,Wildfire,0.1487679385573025,LOW,10371702765.618084,0.3,20915197588.0,utilities,836607903.52,"Fire-resistant landscaping, sprinkler systems, firebreaks",11.39732821310854
+FAC_015,USA,Drought,0.1401161665454884,LOW,577136462.4480822,0.78,3212808713.0,automotive,96384261.39,"Water storage systems, alternative water sources, water recycling",4.98787036519181
+FAC_007,Germany,Storm,0.13155666683105985,LOW,3285329598.731096,0.65,16232276863.0,utilities,608710382.3625001,"Structural reinforcement, storm shutters, emergency generators",4.397196587940916
+FAC_015,USA,Heat,0.1293438609697364,LOW,456656135.71058214,0.9099999999999999,3212808713.0,automotive,72288196.0425,"Enhanced cooling systems, heat-resistant equipment, backup power",5.317160486922412
+FAC_017,Australia,Wildfire,0.11958781665888374,LOW,1534996666.9693153,0.26,3337289237.0,automotive,200237354.22,"Fire-resistant landscaping, sprinkler systems, firebreaks",6.665885683261777
+FAC_006,China,Storm,0.11435725140973661,LOW,5979511272.138082,0.4,20915197588.0,utilities,522879939.70000005,"Structural reinforcement, storm shutters, emergency generators",10.435725140973659
+FAC_013,Japan,Wildfire,0.11326165150011507,LOW,513465354.42328763,0.26,1178695440.0,chemicals,70721726.4,"Fire-resistant landscaping, sprinkler systems, firebreaks",6.260362275648402
+FAC_002,USA,Drought,0.11277601901749877,LOW,675748073.1193151,0.78,4673719658.0,oil_gas,140211589.74,"Water storage systems, alternative water sources, water recycling",3.8194879922008016
+FAC_008,Germany,Storm,0.11137759778806383,LOW,130594329.4290411,0.5,586268388.0,steel,14656709.700000001,"Structural reinforcement, storm shutters, emergency generators",7.9102078230451065
+FAC_009,Australia,Wildfire,0.11015033482871982,LOW,403320020.9432876,0.26,952000787.0,steel,57120047.220000006,"Fire-resistant landscaping, sprinkler systems, firebreaks",6.060918899276911
+FAC_017,Australia,Storm,0.10918172498832557,LOW,934284604.309315,0.39,3337289237.0,automotive,125148346.38750002,"Structural reinforcement, storm shutters, emergency generators",6.46541709321884
+FAC_010,USA,Drought,0.10593066864791789,LOW,221951210.12547946,0.78,1634294828.0,cement,49028844.84,"Water storage systems, alternative water sources, water recycling",3.526951651620423
+FAC_011,USA,Drought,0.1039842459456254,LOW,136405750.88342467,0.78,1023198127.0,cement,30695943.81,"Water storage systems, alternative water sources, water recycling",3.4437711942574953
+FAC_013,Japan,Flood,0.10254473407512081,LOW,442743628.02328765,0.27299999999999996,1178695440.0,chemicals,53041294.8,"Flood barriers, elevated equipment, drainage systems, flood insurance",7.347149700864536
+FAC_018,Japan,Wildfire,0.10064342166391355,LOW,386792981.61945206,0.26,999232474.0,real_estate,59953948.44,"Fire-resistant landscaping, sprinkler systems, firebreaks",5.4515013887124075
