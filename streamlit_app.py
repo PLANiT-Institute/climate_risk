@@ -179,15 +179,24 @@ def render_main_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("📊 Download Sample Facilities Data"):
-                sample_data = create_sample_facilities_data()
-                csv = sample_data.to_csv(index=False)
-                st.download_button(
-                    label="💾 Download CSV",
-                    data=csv,
-                    file_name="sample_facilities.csv",
-                    mime="text/csv"
-                )
+            col1a, col1b = st.columns(2)
+            with col1a:
+                if st.button("📊 Download Sample Data"):
+                    sample_data = create_sample_facilities_data()
+                    csv = sample_data.to_csv(index=False)
+                    st.download_button(
+                        label="💾 Download CSV",
+                        data=csv,
+                        file_name="sample_facilities.csv",
+                        mime="text/csv"
+                    )
+            with col1b:
+                if st.button("⚡ Use Sample Data Now"):
+                    sample_data = create_sample_facilities_data()
+                    st.session_state.facilities_df = sample_data
+                    st.session_state.data_uploaded = True
+                    st.success("🎉 Sample data loaded successfully!")
+                    st.rerun()
         
         with col2:
             st.info("Sample data includes 10 facilities across different sectors with all required fields.")
