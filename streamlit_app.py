@@ -81,7 +81,8 @@ def initialize_session_state():
         st.session_state.analysis_results = {
             'macc': None,
             'physical_risk': None,
-            'pathways': None
+            'pathways': None,
+            'esg_compliance': None
         }
 
 def render_sidebar():
@@ -93,6 +94,7 @@ def render_sidebar():
         'Data Upload': st.session_state.data_uploaded,
         'MACC Analysis': st.session_state.analysis_results['macc'] is not None,
         'Physical Risk': st.session_state.analysis_results['physical_risk'] is not None,
+        'ESG Compliance': st.session_state.analysis_results['esg_compliance'] is not None,
         'Pathways': st.session_state.analysis_results['pathways'] is not None
     }
     
@@ -155,11 +157,12 @@ def render_main_dashboard():
     
     with col3:
         st.markdown("""
-        ### 🛣️ Net-Zero Pathways
-        - Strategic roadmaps
-        - Timeline optimization
-        - Budget planning
-        - Scenario analysis
+        ### 🏆 ESG Compliance
+        - TCFD reporting readiness
+        - Science-based targets (SBTi)
+        - EU Taxonomy alignment
+        - CDP scoring improvement
+        - Green financing opportunities
         """)
     
     # Getting started section
@@ -249,6 +252,7 @@ def render_data_overview():
     analysis_status = [
         ("MACC Analysis", st.session_state.analysis_results['macc'] is not None, "Identify cost-effective decarbonization opportunities"),
         ("Physical Risk", st.session_state.analysis_results['physical_risk'] is not None, "Assess climate-related physical risks"), 
+        ("ESG Compliance", st.session_state.analysis_results['esg_compliance'] is not None, "Link to ESG frameworks and business requirements"),
         ("Net-Zero Pathways", st.session_state.analysis_results['pathways'] is not None, "Generate strategic decarbonization roadmaps")
     ]
     
