@@ -55,6 +55,8 @@ def create_executive_summary_metrics():
     # Check what analyses are available
     macc_results = st.session_state.analysis_results.get('macc')
     physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
     
     if not macc_results and not physical_risk_results:
         st.warning("⚠️ No analysis results available. Please run MACC or Physical Risk analysis first.")
@@ -96,9 +98,9 @@ def create_executive_summary_metrics():
     
     with col5:
         # Analysis completion status
-        completed_analyses = sum([macc_results is not None, physical_risk_results is not None])
+        completed_analyses = sum([macc_results is not None, physical_risk_results is not None, esg_results is not None])
         st.markdown(f"""
-        <div class="metric-big">{completed_analyses}/2</div>
+        <div class="metric-big">{completed_analyses}/3</div>
         <div class="metric-label">Analyses Complete</div>
         """, unsafe_allow_html=True)
 
@@ -106,6 +108,8 @@ def create_risk_opportunity_matrix():
     """Create risk vs opportunity strategic matrix"""
     
     macc_results = st.session_state.analysis_results.get('macc')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
     physical_risk_results = st.session_state.analysis_results.get('physical_risk')
     
     if not macc_results or not physical_risk_results:
@@ -201,6 +205,8 @@ def create_financial_impact_waterfall():
     
     macc_results = st.session_state.analysis_results.get('macc')
     physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
     
     if not macc_results or not physical_risk_results:
         return None
@@ -247,6 +253,8 @@ def create_implementation_timeline():
     """Create implementation timeline visualization"""
     
     macc_results = st.session_state.analysis_results.get('macc')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
     
     if not macc_results:
         return None
@@ -300,6 +308,8 @@ def render_results_dashboard():
     
     # Check if any analyses are complete
     macc_results = st.session_state.analysis_results.get('macc')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
     physical_risk_results = st.session_state.analysis_results.get('physical_risk')
     
     if not macc_results and not physical_risk_results:
@@ -498,6 +508,8 @@ def generate_executive_summary():
     
     facilities_df = st.session_state.facilities_df
     macc_results = st.session_state.analysis_results.get('macc')
+    physical_risk_results = st.session_state.analysis_results.get('physical_risk')
+    esg_results = st.session_state.analysis_results.get('esg_compliance')
     physical_risk_results = st.session_state.analysis_results.get('physical_risk')
     
     report = f"""# Climate Risk Assessment - Executive Summary
