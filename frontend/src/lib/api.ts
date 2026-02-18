@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`);
@@ -184,6 +184,30 @@ export interface ChecklistItem {
   recommendation: string;
 }
 
+export interface GapAnalysisItem {
+  category: string;
+  current_score: number;
+  target_score: number;
+  gap: number;
+  impact: number;
+  effort: string;
+  priority_score: number;
+  recommended_actions: string[];
+}
+
+export interface RegulatoryDeadline {
+  name: string;
+  date: string;
+  description: string;
+  source: string;
+}
+
+export interface MaturityLevel {
+  level: number;
+  name: string;
+  description: string;
+}
+
 export interface ESGAssessment {
   framework: string;
   framework_name: string;
@@ -192,6 +216,9 @@ export interface ESGAssessment {
   categories: FrameworkScore[];
   checklist: ChecklistItem[];
   recommendations: string[];
+  maturity_level?: MaturityLevel;
+  gap_analysis?: GapAnalysisItem[];
+  regulatory_deadlines?: RegulatoryDeadline[];
 }
 
 export interface ESGDisclosureData {
