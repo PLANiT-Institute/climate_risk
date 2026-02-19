@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.v1 import transition, physical, scenarios, esg, company
+from .api.v1 import transition, physical, scenarios, esg, company, partner
 
 app = FastAPI(
     title="Climate Risk Platform API",
@@ -28,6 +28,7 @@ app.include_router(company.router, prefix="/api/v1", tags=["company"])
 app.include_router(transition.router, prefix="/api/v1/transition-risk", tags=["transition-risk"])
 app.include_router(physical.router, prefix="/api/v1/physical-risk", tags=["physical-risk"])
 app.include_router(esg.router, prefix="/api/v1/esg", tags=["esg"])
+app.include_router(partner.router, prefix="/api/v1/partner", tags=["partner"])
 
 
 @app.get("/")

@@ -55,7 +55,9 @@ _FRAMEWORKS = {
 
 
 # ── Data-Driven Score Computation ────────────────────────────────────
-def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
+def _compute_data_driven_scores(
+    framework_id: str, facilities: list | None = None
+) -> Dict[str, float]:
     """Compute category scores based on actual data availability and model state.
 
     Inspired by CDP Scoring Methodology (2023):
@@ -78,7 +80,7 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
     Returns:
         {category_name: score (0-100)}
     """
-    facilities = get_all_facilities()
+    facilities = facilities if facilities is not None else get_all_facilities()
 
     # Check data availability
     has_scope1 = all(f["current_emissions_scope1"] > 0 for f in facilities)
@@ -90,7 +92,7 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
 
     # Check if transition analysis is available (analytical model)
     try:
-        nz_result = analyse_scenario("net_zero_2050")
+        nz_result = analyse_scenario("net_zero_2050", facilities=facilities)
         has_transition_analysis = nz_result["total_npv"] != 0
         has_multi_scenario = True
     except Exception:
@@ -100,7 +102,7 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
     # Physical risk model state
     from ..services.physical_risk import assess_physical_risk
     try:
-        pr = assess_physical_risk()
+        pr = assess_physical_risk(facilities=facilities)
         has_physical_model = pr.get("model_status") == "analytical_v1"
     except Exception:
         has_physical_model = False
@@ -183,26 +185,28 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
 
 
 # ── Dynamic Checklist Evaluation ─────────────────────────────────────
-def _evaluate_checklist(framework_id: str) -> List[dict]:
+def _evaluate_checklist(
+    framework_id: str, facilities: list | None = None
+) -> List[dict]:
     """Evaluate compliance checklist dynamically based on actual data state.
 
     Each item is evaluated against real conditions, not hardcoded.
     """
-    facilities = get_all_facilities()
+    facilities = facilities if facilities is not None else get_all_facilities()
 
     has_scope1 = all(f["current_emissions_scope1"] > 0 for f in facilities)
     has_scope2 = all(f["current_emissions_scope2"] > 0 for f in facilities)
     has_scope3 = all(f["current_emissions_scope3"] > 0 for f in facilities)
 
     try:
-        nz = analyse_scenario("net_zero_2050")
+        nz = analyse_scenario("net_zero_2050", facilities=facilities)
         has_transition = nz["total_npv"] != 0
     except Exception:
         has_transition = False
 
     from ..services.physical_risk import assess_physical_risk
     try:
-        pr = assess_physical_risk()
+        pr = assess_physical_risk(facilities=facilities)
         has_physical = pr.get("model_status") == "analytical_v1"
     except Exception:
         has_physical = False
@@ -484,12 +488,14 @@ def _compliance_level(score: float) -> str:
 
 
 # ── Public API ──────────────────────────────────────────────────────
-def assess_framework(framework_id: str) -> dict:
+def assess_framework(
+    framework_id: str, facilities: list | None = None
+) -> dict:
     """Assess ESG compliance for a given framework with data-driven scoring."""
     fw = _FRAMEWORKS[framework_id]
 
     # Compute scores dynamically
-    scores = _compute_data_driven_scores(framework_id)
+    scores = _compute_data_driven_scores(framework_id, facilities=facilities)
 
     categories = []
     weighted_total = 0.0
@@ -506,7 +512,7 @@ def assess_framework(framework_id: str) -> dict:
         })
 
     overall = round(weighted_total, 1)
-    checklist = _evaluate_checklist(framework_id)
+    checklist = _evaluate_checklist(framework_id, facilities=facilities)
     compliant = sum(1 for c in checklist if c["status"] == "compliant")
     total_items = len(checklist)
 
@@ -551,8 +557,10 @@ def _get_relevant_deadlines(framework_id: str) -> List[dict]:
     return deadlines
 
 
-def get_disclosure_data(framework_id: str) -> dict:
-    facilities = get_all_facilities()
+def get_disclosure_data(
+    framework_id: str, facilities: list | None = None
+) -> dict:
+    facilities = facilities if facilities is not None else get_all_facilities()
     total_s1 = sum(f["current_emissions_scope1"] for f in facilities)
     total_s2 = sum(f["current_emissions_scope2"] for f in facilities)
     total_s3 = sum(f["current_emissions_scope3"] for f in facilities)
@@ -560,7 +568,7 @@ def get_disclosure_data(framework_id: str) -> dict:
 
     # Get transition risk summary for Net Zero scenario
     try:
-        nz = analyse_scenario("net_zero_2050")
+        nz = analyse_scenario("net_zero_2050", facilities=facilities)
         npv = nz["total_npv"]
     except Exception:
         npv = 0

@@ -277,14 +277,19 @@ def _risk_level(npv_pct: float) -> str:
 
 
 # ── Public API ──────────────────────────────────────────────────────
-def analyse_scenario(scenario_id: str, pricing_regime: str = "global") -> dict:
+def analyse_scenario(
+    scenario_id: str,
+    pricing_regime: str = "global",
+    facilities: list | None = None,
+) -> dict:
     """Full transition-risk analysis for one scenario.
 
     Args:
         scenario_id: NGFS scenario identifier.
         pricing_regime: "global" (default) or "kets" (K-ETS with free allocation).
+        facilities: optional facility list; defaults to sample_facilities.
     """
-    facilities = get_all_facilities()
+    facilities = facilities if facilities is not None else get_all_facilities()
     carbon_prices = get_carbon_price_trajectory(
         scenario_id, PROJECTION_YEARS, pricing_regime=pricing_regime,
     )
@@ -404,8 +409,12 @@ def analyse_scenario(scenario_id: str, pricing_regime: str = "global") -> dict:
     }
 
 
-def get_summary(scenario_id: str, pricing_regime: str = "global") -> dict:
-    analysis = analyse_scenario(scenario_id, pricing_regime=pricing_regime)
+def get_summary(
+    scenario_id: str,
+    pricing_regime: str = "global",
+    facilities: list | None = None,
+) -> dict:
+    analysis = analyse_scenario(scenario_id, pricing_regime=pricing_regime, facilities=facilities)
     facs = analysis["facilities"]
     levels = [f["risk_level"] for f in facs]
 
@@ -440,10 +449,13 @@ def get_summary(scenario_id: str, pricing_regime: str = "global") -> dict:
     }
 
 
-def compare_scenarios(pricing_regime: str = "global") -> dict:
+def compare_scenarios(
+    pricing_regime: str = "global",
+    facilities: list | None = None,
+) -> dict:
     """Compare all four NGFS scenarios side-by-side."""
     scenario_ids = list(SCENARIOS.keys())
-    analyses = {sid: analyse_scenario(sid, pricing_regime=pricing_regime) for sid in scenario_ids}
+    analyses = {sid: analyse_scenario(sid, pricing_regime=pricing_regime, facilities=facilities) for sid in scenario_ids}
 
     npv_comparison = []
     emission_pathways: Dict[str, list] = {}
