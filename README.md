@@ -5,8 +5,8 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-45%20passed-brightgreen.svg)]()
+[![Python](https://img.shields.io/badge/Python-3.14-3776AB.svg)](https://python.org)
+[![Tests](https://img.shields.io/badge/Tests-80%20passed-brightgreen.svg)]()
 [![Render](https://img.shields.io/badge/Backend-Render-46E3B7.svg)](https://render.com)
 [![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000.svg)](https://vercel.com)
 
@@ -14,9 +14,11 @@
 
 ## Overview
 
-The Climate Risk Analysis Platform quantifies climate-related financial risks for 17 Korean industrial facilities across 8 sectors. It evaluates three risk domains -- transition risk (carbon pricing, stranded assets, abatement costs), physical risk (flood, typhoon, heatwave, drought, sea-level rise), and ESG disclosure readiness (TCFD, ISSB, KSSB) -- under four NGFS climate scenarios projected to 2050.
+The Climate Risk Analysis Platform quantifies climate-related financial risks for Korean industrial facilities across 10 sectors. It evaluates three risk domains -- transition risk (carbon pricing, stranded assets, abatement costs), physical risk (flood, typhoon, heatwave, drought, sea-level rise), and ESG disclosure readiness (TCFD, ISSB, KSSB) -- under four NGFS climate scenarios projected to 2050.
 
 All analytical models are academically grounded (IPCC AR6, Bass 1969 diffusion, Gumbel extreme-value theory, NGFS Phase IV 2023) and parameterized with Korean-specific data from KMA, K-water, and the Korea Exchange (KRX). The platform supports both global carbon pricing (USD) and Korea Emissions Trading Scheme (K-ETS, KRW) pricing regimes.
+
+**Partner API** enables external companies to submit their own facility data and run the same analyses via REST endpoints, with UUID-based session management and 2-hour TTL.
 
 The system is deployed as three independent layers: a FastAPI backend (Render), a Next.js dashboard (Vercel), and a Streamlit demo app (Streamlit Cloud).
 
@@ -32,21 +34,24 @@ graph TB
 
     subgraph Backend["Backend (FastAPI / Render)"]
         API[REST API v1]
+        PA[Partner API]
         TR[transition_risk]
         PR[physical_risk]
         ESG[esg_compliance]
         CP[carbon_pricing]
         RM[risk_math]
         CS[climate_science]
+        PS[partner_store]
     end
 
     subgraph Data["Data Layer"]
         FAC[sample_facilities<br/>17 Korean facilities]
-        CFG[config.py<br/>NGFS scenarios, K-ETS,<br/>sector parameters]
+        CFG[config.py<br/>NGFS scenarios, K-ETS,<br/>10 sector parameters]
     end
 
     subgraph External["External"]
         OM[Open-Meteo Archive API<br/>30-year historical weather]
+        PART[Partner Companies<br/>Custom facility data]
     end
 
     subgraph Streamlit["Streamlit Demo"]
@@ -54,6 +59,11 @@ graph TB
     end
 
     FE -->|HTTP/JSON| API
+    PART -->|POST facilities| PA
+    PA --> PS
+    PA --> TR
+    PA --> PR
+    PA --> ESG
     API --> TR
     API --> PR
     API --> ESG
@@ -107,9 +117,15 @@ graph TB
 - Gap analysis with priority rankings
 - Regulatory deadline tracking (KSSB mandatory 2025, EU CBAM 2026, KSSB full scope 2027)
 
+### Partner API
+- POST facility data to create a session (UUID-based, 2-hour TTL)
+- Run transition risk, physical risk, and ESG analyses scoped to partner facilities only
+- Unknown sectors accepted with warnings (default parameters applied)
+- 10 endpoints: session CRUD + 6 analysis endpoints
+
 ### Data Coverage
-- 17 Korean industrial facilities across 8 sectors
-- 10 sector parameter sets (including real estate and financial services)
+- 17 built-in Korean industrial facilities across 8 sectors
+- 10 sector parameter sets (steel, petrochemical, cement, utilities, oil_gas, shipping, automotive, electronics, real_estate, financial)
 - Open-Meteo 30-year historical weather data with 1-hour TTL cache
 
 ---
@@ -176,7 +192,7 @@ The Streamlit app imports backend services directly -- no API server required.
 
 Base URL: `/api/v1` -- Interactive documentation at `/docs` (Swagger UI).
 
-### Endpoints
+### Core Endpoints
 
 | Method | Path | Description | Key Parameters |
 |--------|------|-------------|---------------|
@@ -193,6 +209,21 @@ Base URL: `/api/v1` -- Interactive documentation at `/docs` (Swagger UI).
 | GET | `/api/v1/esg/disclosure-data` | Disclosure detail data | `framework` |
 | GET | `/api/v1/esg/frameworks` | List ESG frameworks | -- |
 | GET | `/health` | Health check | -- |
+
+### Partner API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/partner/sessions` | Create partner session with facility data |
+| GET | `/api/v1/partner/sessions/{partner_id}` | Get session info |
+| DELETE | `/api/v1/partner/sessions/{partner_id}` | Delete session |
+| GET | `/api/v1/partner/sessions/{pid}/facilities` | List partner facilities |
+| GET | `/api/v1/partner/sessions/{pid}/transition-risk/analysis` | Transition risk (partner scope) |
+| GET | `/api/v1/partner/sessions/{pid}/transition-risk/summary` | Transition summary (partner scope) |
+| GET | `/api/v1/partner/sessions/{pid}/transition-risk/comparison` | Scenario comparison (partner scope) |
+| GET | `/api/v1/partner/sessions/{pid}/physical-risk/assessment` | Physical risk (partner scope) |
+| GET | `/api/v1/partner/sessions/{pid}/esg/assessment` | ESG assessment (partner scope) |
+| GET | `/api/v1/partner/sessions/{pid}/esg/disclosure-data` | ESG disclosure (partner scope) |
 
 ### Parameter Reference
 
@@ -224,6 +255,35 @@ ESG assessment under KSSB framework:
 curl "http://localhost:8000/api/v1/esg/assessment?framework=kssb"
 ```
 
+Partner API -- create session and run analysis:
+
+```bash
+# 1. Create session
+curl -X POST "http://localhost:8000/api/v1/partner/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_name": "ABC Corp",
+    "facilities": [{
+      "facility_id": "F001",
+      "name": "ABC Steel Plant",
+      "company": "ABC Corp",
+      "sector": "steel",
+      "latitude": 35.5,
+      "longitude": 129.0,
+      "current_emissions_scope1": 500000,
+      "current_emissions_scope2": 200000,
+      "annual_revenue": 800000000,
+      "ebitda": 80000000,
+      "assets_value": 1200000000
+    }]
+  }'
+
+# Response: { "partner_id": "uuid-xxx", ... }
+
+# 2. Run transition risk analysis
+curl "http://localhost:8000/api/v1/partner/sessions/{uuid-xxx}/transition-risk/analysis?scenario=net_zero_2050"
+```
+
 ---
 
 ## Project Structure
@@ -238,7 +298,8 @@ climate_risk/
 │   │   │   ├── physical.py          # /physical-risk endpoints
 │   │   │   ├── esg.py               # /esg endpoints
 │   │   │   ├── scenarios.py         # /scenarios endpoints
-│   │   │   └── company.py           # /company endpoints
+│   │   │   ├── company.py           # /company endpoints
+│   │   │   └── partner.py           # /partner endpoints (Partner API)
 │   │   ├── services/
 │   │   │   ├── transition_risk.py   # S-curve, NPV, stranded assets
 │   │   │   ├── physical_risk.py     # Gumbel flood, Poisson typhoon, EAL
@@ -246,15 +307,17 @@ climate_risk/
 │   │   │   ├── carbon_pricing.py    # NGFS paths, K-ETS free allocation
 │   │   │   ├── risk_math.py         # WACC, NPV, discount rate utilities
 │   │   │   ├── climate_science.py   # Warming projections, SLR
-│   │   │   └── open_meteo.py        # Historical weather API client
+│   │   │   ├── open_meteo.py        # Historical weather API client
+│   │   │   └── partner_store.py     # In-memory partner session store
 │   │   ├── models/
-│   │   │   └── schemas.py           # Pydantic v2 response models
+│   │   │   └── schemas.py           # Pydantic v2 response/request models
 │   │   ├── core/
-│   │   │   └── config.py            # Scenarios, sector params, citations
+│   │   │   └── config.py            # Scenarios, 10 sector params, citations
 │   │   ├── data/
 │   │   │   └── sample_facilities.py # 17 Korean facility records
 │   │   └── tests/
-│   │       └── test_services.py     # 45 unit tests
+│   │       ├── test_services.py     # 61 service unit tests
+│   │       └── test_partner_api.py  # 19 Partner API integration tests
 │   ├── requirements.txt
 │   └── render.yaml                  # Render.com deployment config
 ├── frontend/
@@ -270,6 +333,12 @@ climate_risk/
 │   ├── pages/                       # Multi-page Streamlit views
 │   ├── utils/                       # Formatting helpers
 │   └── requirements.txt
+├── pages/                           # Legacy Streamlit pages (standalone)
+│   ├── 01_📊_Data_Upload.py
+│   ├── 02_🔄_Transition_Risk.py    # Backend service-based analysis
+│   ├── 04_🌪️_Physical_Risk.py
+│   ├── 05_🏆_ESG_Compliance.py
+│   └── 06_📑_Results_Dashboard.py
 └── README.md
 ```
 
@@ -306,6 +375,8 @@ climate_risk/
 | Shipping | 1 | 부산항 해운기지 |
 | Oil & Gas | 2 | 울산정유공장, 대산정유공장 |
 | **Total** | **17** | |
+
+Partner API supports all 10 sectors (including real_estate and financial). Unknown sectors are accepted with a warning and use default parameters.
 
 ---
 
@@ -354,10 +425,18 @@ climate_risk/
 ```bash
 cd backend
 source venv/bin/activate
+
+# All tests (80)
+pytest app/tests/ -v
+
+# Service tests only (61)
 pytest app/tests/test_services.py -v
+
+# Partner API tests only (19)
+pytest app/tests/test_partner_api.py -v
 ```
 
-45 tests covering: carbon pricing interpolation, K-ETS free allocation, transition risk S-curve, physical risk Gumbel/Poisson models, ESG framework scoring, risk math utilities, and climate science projections.
+80 tests covering: carbon pricing interpolation, K-ETS free allocation, transition risk S-curve, physical risk Gumbel/Poisson models, ESG framework scoring, risk math utilities, climate science projections, Partner API session management, partner-scoped analyses, and backward compatibility.
 
 ---
 
@@ -391,6 +470,7 @@ The Streamlit app imports backend services directly via Python (`from app.servic
 - [x] Open-Meteo historical weather integration
 - [x] ESG disclosure engine (TCFD / ISSB / KSSB)
 - [x] Next.js dashboard with interactive charts
+- [x] Partner API for external company facility data integration
 - [ ] DCF cashflow impact analysis (H2 2026)
 - [ ] PDF report generation
 - [ ] Multi-company portfolio mode

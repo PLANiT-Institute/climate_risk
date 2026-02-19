@@ -712,3 +712,22 @@ REGULATORY_DEADLINES: Dict[str, dict] = {
         "source": "금융위원회, 'ESG 공시 제도 도입 방안' (2023.02.16)",
     },
 }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PARTNER API: KNOWN SECTOR REGISTRY
+# ═══════════════════════════════════════════════════════════════════════
+
+KNOWN_SECTORS: frozenset = frozenset({
+    "steel", "petrochemical", "cement", "utilities", "oil_gas",
+    "shipping", "automotive", "electronics", "real_estate", "financial",
+})
+
+
+def get_sector_warnings(sectors: set) -> list[str]:
+    """미지원 섹터에 대한 경고 메시지 반환."""
+    unknown = sectors - KNOWN_SECTORS
+    return [
+        f"'{s}' 섹터는 지원 목록에 없습니다. 기본 파라미터가 적용됩니다."
+        for s in sorted(unknown)
+    ]

@@ -537,6 +537,7 @@ def assess_physical_risk(
     scenario_id: str = "current_policies",
     year: int = 2030,
     use_api_data: bool = False,
+    facilities: list | None = None,
 ) -> dict:
     """Comprehensive physical risk assessment using analytical models.
 
@@ -544,12 +545,13 @@ def assess_physical_risk(
         scenario_id: NGFS scenario (default "current_policies" for backward compat).
         year: assessment year (default 2030).
         use_api_data: if True, fetch climate baselines from Open-Meteo API.
+        facilities: optional facility list; defaults to sample_facilities.
 
     Returns:
         Same structure as before, with enhanced hazard data.
         model_status changed from "placeholder" to "analytical_v1".
     """
-    facilities = get_all_facilities()
+    facilities = facilities if facilities is not None else get_all_facilities()
     results: List[dict] = []
     risk_counts = {"High": 0, "Medium": 0, "Low": 0}
 

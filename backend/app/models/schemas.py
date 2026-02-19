@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from typing import Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ───────────────────────── Scenario ─────────────────────────
@@ -32,6 +32,36 @@ class FacilityOut(BaseModel):
     annual_revenue: float  # USD
     ebitda: float
     assets_value: float
+
+
+class FacilityIn(BaseModel):
+    facility_id: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=200)
+    company: str = Field(..., min_length=1, max_length=200)
+    sector: str = Field(..., min_length=1, max_length=50)
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    current_emissions_scope1: float = Field(..., gt=0)
+    current_emissions_scope2: float = Field(..., gt=0)
+    annual_revenue: float = Field(..., gt=0)
+    ebitda: float  # 음수 가능
+    assets_value: float = Field(..., gt=0)
+    current_emissions_scope3: float = Field(default=0.0, ge=0)
+    location: str = Field(default="")
+
+
+class PartnerSessionCreate(BaseModel):
+    company_name: str = Field(..., min_length=1, max_length=200)
+    facilities: list[FacilityIn] = Field(..., min_length=1, max_length=200)
+
+
+class PartnerSessionOut(BaseModel):
+    partner_id: str
+    company_name: str
+    facility_count: int
+    sectors: list[str]
+    sector_warnings: list[str]
+    expires_in_seconds: int
 
 
 # ───────────────────────── Transition Risk ─────────────────────────
