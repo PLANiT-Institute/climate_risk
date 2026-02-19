@@ -50,8 +50,15 @@ def npv_from_list(
 
 
 # ── WACC Scenario Adjustment ────────────────────────────────────────
-# NGFS Technical Documentation 2023: climate scenarios increase cost of capital
-# through physical risk premia and transition uncertainty premia.
+# Climate scenarios increase cost of capital through physical risk premia
+# and transition policy uncertainty premia.
+# Spread values are model assumptions calibrated to:
+# - Bolton & Kacperczyk (2021), J. Financial Economics: ~60bp carbon premium
+# - NGFS (2023), Technical Documentation v4, Section 4.3: qualitative
+#   risk-premium discussion (no published exact bp values).
+# - Battiston et al. (2017), Nature Climate Change: equity risk-premium
+#   differentials (used for directional ordering).
+# Note: Exact spread values are NOT directly from NGFS published tables.
 _SCENARIO_WACC_SPREADS: Dict[str, float] = {
     "net_zero_2050": 0.005,       # +50bp - orderly transition, lowest uncertainty
     "below_2c": 0.0075,           # +75bp
@@ -89,7 +96,8 @@ def wacc_scenario_adjusted(
     Returns:
         Adjusted WACC.
 
-    Reference: NGFS Technical Documentation 2023; Battiston et al. (2017).
+    Reference: Bolton & Kacperczyk (2021); NGFS Technical Documentation (2023);
+    Battiston et al. (2017). See _SCENARIO_WACC_SPREADS for detailed sourcing.
     """
     scenario_spread = _SCENARIO_WACC_SPREADS.get(scenario_id, 0.01)
     sector_spread = _SECTOR_TRANSITION_SPREAD.get(sector, 0.005)

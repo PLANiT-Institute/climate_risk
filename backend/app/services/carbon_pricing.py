@@ -134,15 +134,25 @@ def get_technology_cost_projection(
     target_year: int,
     reference_year: int = 2020,
 ) -> float:
-    """Project technology cost using learning curve (Wright's Law).
+    """Project technology cost using experience-curve decay.
 
     cost(t) = mac_base * (1 - learning_rate) ^ (t - reference_year)
 
-    The learning rate captures cumulative deployment-driven cost reduction.
+    METHODOLOGICAL NOTE: True Wright's Law (1936) relates cost to
+    cumulative production volume, not to elapsed time. The time-based
+    formulation used here is a simplification that assumes approximately
+    constant annual deployment growth, making elapsed years a rough proxy
+    for cumulative doublings. This is standard practice in IEA/IRENA
+    screening models (e.g., IRENA 2023 Fig. 3.7) but overstates cost
+    reduction when deployment stalls and understates it during boom periods.
+
+    The "learning_rate" parameter here is an annual cost reduction rate,
+    NOT the traditional Wright's Law learning rate (% cost reduction per
+    doubling of cumulative production).
 
     Args:
         tech_mac_base: base MAC at reference year ($/tCO2e).
-        learning_rate: annual cost reduction rate.
+        learning_rate: annual cost reduction rate (0-1).
         available_year: first year technology is commercially available.
         target_year: year to project cost for.
         reference_year: base year for learning curve.
@@ -150,7 +160,9 @@ def get_technology_cost_projection(
     Returns:
         Projected MAC ($/tCO2e).
 
-    Reference: Wright's Law; IRENA Renewable Power Generation Costs 2023.
+    Reference: Wright (1936); IRENA Renewable Power Generation Costs 2023;
+    Way et al. (2022), "Empirically grounded technology forecasts and the
+    energy transition", Joule, 6(9), 2057-2082.
     """
     if target_year < available_year:
         return float("inf")  # Not yet available

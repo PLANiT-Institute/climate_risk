@@ -1,586 +1,416 @@
-# Climate Financial Risk Assessment Tool
-
-A comprehensive Python-based tool for assessing climate-related financial risks and net-zero pathways. This tool provides quantitative analysis of transition risk, physical risk, and climate Value at Risk (VaR) for portfolio assessment and regulatory compliance.
-
-## 🌍 Overview
-
-The Climate Financial Risk Assessment Tool calculates climate-related financial risks across multiple dimensions:
-
-- **Transition Risk**: Models carbon pricing scenarios and emission reduction costs
-- **Physical Risk**: Assesses climate hazard-based damage estimates using CLIMADA integration
-- **Net-Zero Pathways**: Creates optimized emission reduction trajectories to net-zero by 2050
-- **Climate Value at Risk (VaR)**: Performs Monte Carlo simulations for risk quantification
-
-## 📋 Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Input Data Format](#input-data-format)
-- [Output Structure](#output-structure)
-- [API Reference](#api-reference)
-- [Web Interface](#web-interface)
-- [Examples](#examples)
-- [Contributing](#contributing)
-- [License](#license)
-
-## ✨ Features
-
-### Core Analysis Modules
-
-1. **Transition Risk Analysis**
-   - Carbon pricing scenario modeling (NDC, Below2C, NetZero)
-   - Emission Trading System (ETS) cost calculations
-   - Sector-specific carbon intensity analysis
-   - NPV calculations with configurable discount rates
-
-2. **Physical Risk Assessment**
-   - CLIMADA integration for hazard modeling
-   - Flood, drought, and extreme weather risk assessment
-   - Asset-level damage estimates
-   - Geospatial analysis capabilities
-
-3. **Net-Zero Pathway Optimization**
-   - Linear and absolute emission reduction trajectories
-   - Cost-optimized abatement pathways using linear programming
-   - Technology-specific marginal abatement cost curves (MACC)
-   - Customizable target years and reduction rates
-
-4. **Climate VaR Calculation**
-   - Monte Carlo simulation framework
-   - Probabilistic risk distributions
-   - 95th percentile VaR estimates
-   - Correlation modeling between risk factors
-
-### Reporting and Visualization
-
-- Automated report generation (Markdown and JSON formats)
-- Interactive visualizations with matplotlib/seaborn
-- Scenario comparison charts
-- Risk distribution histograms
-- Streamlit web interface for interactive analysis
-
-### Advanced Features
-
-- Multi-scenario analysis support
-- Configurable time horizons and discount rates
-- Sensitivity analysis capabilities
-- Export to multiple formats (CSV, Excel, JSON)
-- Command-line interface (CLI) for batch processing
-
-## 🔧 Installation
-
-### Prerequisites
-
-- Python 3.8+ (recommended: 3.11)
-- pip or conda package manager
-
-### Core Dependencies
-
-```bash
-# Install core dependencies
-pip install pandas numpy matplotlib seaborn scipy pulp openpyxl
-
-# For geospatial analysis (optional)
-pip install geopandas rasterio shapely
-
-# For web interface (optional)
-pip install streamlit
-
-# For specialized climate modeling (optional)
-pip install climada climada-petals
-```
-
-### Complete Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/your-username/climate-risk-tool.git
-cd climate-risk-tool
-
-# Install all dependencies
-pip install -r requirements.txt
-
-# Verify installation
-python main.py --help
-```
-
-### Requirements File
-
-Create a `requirements.txt` file with:
-
-```txt
-# Core data analysis
-pandas>=1.5.0
-numpy>=1.20.0
-scipy>=1.8.0
-
-# Visualization
-matplotlib>=3.5.0
-seaborn>=0.11.0
-
-# Optimization
-pulp>=2.6.0
-
-# File formats
-openpyxl>=3.0.0
-
-# Geospatial (optional)
-geopandas>=0.12.0
-shapely>=1.8.0
-rasterio>=1.3.0
-
-# Climate modeling (optional)
-climada>=3.0.0
-climada-petals>=3.0.0
-
-# Web interface (optional)
-streamlit>=1.20.0
-```
-
-## 🚀 Quick Start
-
-### Basic Usage
-
-```bash
-# Run with default settings
-python main.py
-
-# Specify custom input files
-python main.py \
-  --facilities data/my_facilities.xlsx \
-  --carbon_prices data/my_carbon_prices.xlsx \
-  --output_dir results/
-
-# Run specific scenarios
-python main.py --scenarios NDC Below2C --approaches linear optimal
-```
-
-### Example with Sample Data
-
-```bash
-# Generate sample data
-python generate_example_csv.py
-
-# Run analysis with sample data
-python main.py \
-  --facilities example_facilities.csv \
-  --carbon_prices data/carbon_prices.xlsx \
-  --n_simulations 5000
-```
-
-## 📖 Usage
-
-### Command Line Interface
-
-```bash
-python main.py [OPTIONS]
-
-Options:
-  --facilities PATH           Path to facilities Excel/CSV file
-  --carbon_prices PATH        Path to carbon prices Excel file
-  --hazard PATH              Path to flood hazard netCDF file
-  --abatement_costs PATH     Path to abatement costs Excel file
-  --output_dir PATH          Output directory (default: outputs)
-  --scenarios [NDC|Below2C|NetZero]  Scenarios to analyze
-  --approaches [linear|optimal]      Net-zero approaches
-  --discount_rate FLOAT      Discount rate for NPV (default: 0.03)
-  --n_simulations INT        Monte Carlo simulations (default: 1000)
-```
-
-### Python API
-
-```python
-from main import ClimateRiskTool
-
-# Configure analysis
-config = {
-    "facilities": "data/facilities.xlsx",
-    "carbon_prices": "data/carbon_prices.xlsx",
-    "hazard": "data/flood_hazard.nc",
-    "output_dir": "results",
-    "discount_rate": 0.03,
-    "n_simulations": 1000
-}
-
-# Initialize tool
-tool = ClimateRiskTool(config)
-
-# Run financial risk analysis
-tool.run_financial_risk_analysis(scenarios=["NDC", "Below2C"])
-
-# Run net-zero analysis
-tool.run_net_zero_analysis(approaches=["linear", "optimal"])
-
-# Generate reports
-tool.generate_reports()
-```
-
-## ⚙️ Configuration
-
-### Scenarios
-
-The tool supports three main climate scenarios:
-
-1. **NDC (Nationally Determined Contributions)**
-   - Current policy commitments
-   - Moderate carbon pricing trajectory
-   - ~3°C warming pathway
-
-2. **Below2C (Below 2 Degrees)**
-   - Paris Agreement ambitious targets
-   - Higher carbon pricing
-   - ~2°C warming pathway
-
-3. **NetZero (Net Zero by 2050)**
-   - Most ambitious scenario
-   - Highest carbon pricing
-   - 1.5°C warming pathway
-
-### Net-Zero Approaches
-
-1. **Linear Approach**
-   - Constant emission reduction rate
-   - Simple implementation
-   - Uniform annual reductions
-
-2. **Optimal Approach**
-   - Cost-minimized pathway
-   - Uses marginal abatement cost curves
-   - Technology-specific optimization
-
-## 📊 Input Data Format
-
-### Facilities Data (Excel/CSV)
-
-Required columns:
-```csv
-facility_id,facility_name,sector,country,latitude,longitude,annual_emissions_tco2,asset_value_usd
-FAC001,Power Plant A,Energy,USA,40.7128,-74.0060,500000,1000000000
-FAC002,Steel Mill B,Industry,DEU,52.5200,13.4050,750000,500000000
-```
-
-### Carbon Prices Data (Excel)
-
-Required structure:
-```csv
-year,scenario,carbon_price_usd_per_tco2
-2025,NDC,50
-2025,Below2C,75
-2025,NetZero,100
-2030,NDC,75
-2030,Below2C,125
-2030,NetZero,200
-```
-
-### Abatement Costs Data (Excel)
-
-Required structure:
-```csv
-sector,technology,abatement_potential_tco2,cost_usd_per_tco2
-Energy,Solar PV,1000000,25
-Energy,Wind,800000,30
-Industry,Energy Efficiency,500000,40
-```
-
-## 📈 Output Structure
-
-```
-outputs/
-├── financial_risk_summary.csv
-├── scenario_comparison.png
-├── transition_risk_NDC.csv
-├── transition_risk_Below2C.csv
-├── physical_risk_results.csv
-├── netzero_pathway_linear.csv
-├── netzero_pathway_optimal.csv
-├── climate_var_linear_distribution.csv
-├── climate_var_linear_hist.png
-└── reports/
-    ├── financial_risk/
-    │   ├── financial_risk_report.md
-    │   ├── summary.json
-    │   └── visualizations/
-    └── net_zero/
-        ├── net_zero_report.md
-        ├── summary.json
-        └── visualizations/
-```
-
-### Key Output Files
-
-1. **Financial Risk Summary** (`financial_risk_summary.csv`)
-   - NPV costs by scenario
-   - Annual cost profiles
-   - Risk metrics
-
-2. **Transition Risk Results** (`transition_risk_[scenario].csv`)
-   - Facility-level carbon costs
-   - Year-by-year projections
-   - ETS cost calculations
-
-3. **Physical Risk Results** (`physical_risk_results.csv`)
-   - Hazard exposure assessments
-   - Damage estimates
-   - Risk ratings
-
-4. **Net-Zero Pathways** (`netzero_pathway_[approach].csv`)
-   - Emission trajectories
-   - Abatement costs
-   - Technology deployment
-
-5. **Climate VaR Distribution** (`climate_var_[approach]_distribution.csv`)
-   - Monte Carlo simulation results
-   - Probability distributions
-   - Risk quantiles
-
-## 🖥️ Web Interface
-
-Launch the Streamlit web interface:
-
-```bash
-streamlit run app/streamlit_app.py
-```
-
-Or use the simplified web interface:
-
-```bash
-python web.py
-```
-
-The web interface provides:
-- Interactive parameter configuration
-- Real-time analysis execution
-- Dynamic visualizations
-- Results download capabilities
-
-## 📚 API Reference
-
-### ClimateRiskTool Class
-
-```python
-class ClimateRiskTool:
-    def __init__(self, config: Dict[str, Any])
-    def run_financial_risk_analysis(self, scenarios: List[str] = None)
-    def run_net_zero_analysis(self, approaches: List[str] = None)
-    def generate_reports(self)
-```
-
-### Core Modules
-
-#### TransitionRisk
-```python
-from util.transition_risk import TransitionRisk
-
-tr = TransitionRisk(facilities_path, carbon_prices_path, scenario="NDC")
-results = tr.run()
-```
-
-#### PhysicalRisk
-```python
-from util.physical_risk import PhysicalRisk
-
-pr = PhysicalRisk(facilities_df, hazard_path)
-results = pr.run()
-```
-
-#### NetZeroPathway
-```python
-from util.net_zero import NetZeroPathway, OptimalEmissionPathway
-
-# Linear pathway
-nz = NetZeroPathway(facilities_path, approach="linear")
-pathway = nz.run()
-
-# Optimal pathway
-opt = OptimalEmissionPathway(facilities_path, carbon_prices_path, abatement_costs_path)
-pathway = opt.run()
-```
-
-#### ClimateVaR
-```python
-from util.climate_var import ClimateVaR
-
-cvar = ClimateVaR(transition_df, physical_df, netzero_df, discount_rate=0.03)
-var_95, distribution = cvar.run_deep_monte_carlo(n_sim=1000, percentile=0.95)
-```
-
-## 🔍 Examples
-
-### Example 1: Basic Analysis
-
-```python
-# Configure for basic analysis
-config = {
-    "facilities": "data/input_facilities.xlsx",
-    "carbon_prices": "data/carbon_prices.xlsx",
-    "output_dir": "basic_analysis",
-    "discount_rate": 0.05
-}
-
-tool = ClimateRiskTool(config)
-tool.run_financial_risk_analysis(scenarios=["NDC"])
-```
-
-### Example 2: Comprehensive Analysis
-
-```python
-# Full analysis with all scenarios and approaches
-config = {
-    "facilities": "data/large_portfolio.xlsx",
-    "carbon_prices": "data/carbon_prices.xlsx",
-    "hazard": "data/flood_hazard.nc",
-    "abatement_costs": "data/abatement_costs.xlsx",
-    "output_dir": "comprehensive_analysis",
-    "discount_rate": 0.03,
-    "n_simulations": 10000
-}
-
-tool = ClimateRiskTool(config)
-tool.run_financial_risk_analysis(scenarios=["NDC", "Below2C", "NetZero"])
-tool.run_net_zero_analysis(approaches=["linear", "optimal"])
-tool.generate_reports()
-```
-
-### Example 3: Custom Scenario Analysis
-
-```python
-# Sensitivity analysis across discount rates
-discount_rates = [0.02, 0.03, 0.05, 0.07]
-results = {}
-
-for rate in discount_rates:
-    config = {
-        "facilities": "data/facilities.xlsx",
-        "carbon_prices": "data/carbon_prices.xlsx",
-        "output_dir": f"sensitivity_{rate}",
-        "discount_rate": rate
-    }
-    
-    tool = ClimateRiskTool(config)
-    tool.run_financial_risk_analysis()
-    results[rate] = tool.results
-```
-
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-# Run all tests
-python -m pytest tests/
-
-# Run specific test modules
-python -m pytest tests/test_transition_risk.py
-python -m pytest tests/test_net_zero.py
-
-# Run with coverage
-python -m pytest --cov=util tests/
-```
-
-## 📈 Performance Considerations
-
-### Optimization Tips
-
-1. **Large Portfolios**: Use batch processing for >1000 facilities
-2. **Monte Carlo Simulations**: Start with 1000 simulations, increase as needed
-3. **Geospatial Analysis**: Consider memory usage with large raster datasets
-4. **Parallel Processing**: Utilize multiprocessing for scenario analysis
-
-### Memory Management
-
-```python
-# For large datasets, process in chunks
-chunk_size = 100
-for i in range(0, len(facilities_df), chunk_size):
-    chunk = facilities_df.iloc[i:i+chunk_size]
-    # Process chunk
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Memory Errors**: Reduce simulation count or process in batches
-2. **Geospatial Dependencies**: Install GDAL system libraries
-3. **Excel File Errors**: Ensure openpyxl is installed
-4. **CLIMADA Issues**: Check system dependencies and data availability
-
-### Debug Mode
-
-```bash
-# Enable verbose logging
-python main.py --verbose --debug
-
-# Check dependency versions
-python -c "import pandas; print(pandas.__version__)"
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
-
-### Development Setup
-
-```bash
-# Fork and clone the repository
-git clone https://github.com/your-username/climate-risk-tool.git
-
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Run pre-commit hooks
-pre-commit install
-
-# Run tests
-python -m pytest
-```
-
-### Code Style
-
-- Follow PEP 8 style guidelines
-- Use type hints where appropriate
-- Add docstrings to all public functions
-- Write unit tests for new features
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- CLIMADA platform for physical risk modeling
-- Paris Agreement scenario frameworks
-- IPCC AR6 methodologies
-- Open-source climate risk community
-
-## 📞 Support
-
-For questions and support:
-- Create an issue on GitHub
-- Email: support@climate-risk-tool.com
-- Documentation: https://climate-risk-tool.readthedocs.io
-
-## 🗺️ Roadmap
-
-### Upcoming Features
-
-- [ ] Machine learning-based risk prediction
-- [ ] Real-time data integration
-- [ ] Enhanced visualization dashboard
-- [ ] API endpoint development
-- [ ] Docker containerization
-- [ ] Cloud deployment templates
-
-### Version History
-
-- **v1.0.0**: Initial release with core functionality
-- **v1.1.0**: Added optimal pathway optimization
-- **v1.2.0**: Enhanced physical risk modeling
-- **v2.0.0**: Web interface and API development (planned)
+# Climate Risk Analysis Platform
+
+**NGFS scenario-based climate financial risk assessment for Korean industrial facilities**
+
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://python.org)
+[![Tests](https://img.shields.io/badge/Tests-45%20passed-brightgreen.svg)]()
+[![Render](https://img.shields.io/badge/Backend-Render-46E3B7.svg)](https://render.com)
+[![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000.svg)](https://vercel.com)
 
 ---
 
-*This tool is designed for financial risk assessment and regulatory compliance. Results should be validated against industry standards and used in conjunction with expert judgment.*
+## Overview
+
+The Climate Risk Analysis Platform quantifies climate-related financial risks for 17 Korean industrial facilities across 8 sectors. It evaluates three risk domains -- transition risk (carbon pricing, stranded assets, abatement costs), physical risk (flood, typhoon, heatwave, drought, sea-level rise), and ESG disclosure readiness (TCFD, ISSB, KSSB) -- under four NGFS climate scenarios projected to 2050.
+
+All analytical models are academically grounded (IPCC AR6, Bass 1969 diffusion, Gumbel extreme-value theory, NGFS Phase IV 2023) and parameterized with Korean-specific data from KMA, K-water, and the Korea Exchange (KRX). The platform supports both global carbon pricing (USD) and Korea Emissions Trading Scheme (K-ETS, KRW) pricing regimes.
+
+The system is deployed as three independent layers: a FastAPI backend (Render), a Next.js dashboard (Vercel), and a Streamlit demo app (Streamlit Cloud).
+
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (Next.js 14 / Vercel)"]
+        FE[Dashboard, Scenario Comparison,<br/>Transition Risk, Physical Risk,<br/>ESG Disclosure, Company Profile]
+    end
+
+    subgraph Backend["Backend (FastAPI / Render)"]
+        API[REST API v1]
+        TR[transition_risk]
+        PR[physical_risk]
+        ESG[esg_compliance]
+        CP[carbon_pricing]
+        RM[risk_math]
+        CS[climate_science]
+    end
+
+    subgraph Data["Data Layer"]
+        FAC[sample_facilities<br/>17 Korean facilities]
+        CFG[config.py<br/>NGFS scenarios, K-ETS,<br/>sector parameters]
+    end
+
+    subgraph External["External"]
+        OM[Open-Meteo Archive API<br/>30-year historical weather]
+    end
+
+    subgraph Streamlit["Streamlit Demo"]
+        ST[Multi-page app<br/>Direct service import]
+    end
+
+    FE -->|HTTP/JSON| API
+    API --> TR
+    API --> PR
+    API --> ESG
+    TR --> CP
+    TR --> RM
+    PR --> CS
+    PR -->|optional| OM
+    TR --> FAC
+    PR --> FAC
+    ESG --> FAC
+    TR --> CFG
+    PR --> CFG
+    ESG --> CFG
+    ST --> TR
+    ST --> PR
+    ST --> ESG
+```
+
+| Layer | Technology | Directory | Deployment |
+|-------|-----------|-----------|------------|
+| Backend API | FastAPI + Pydantic v2 | `backend/` | Render.com |
+| Frontend | Next.js 14 + Tailwind CSS | `frontend/` | Vercel |
+| Streamlit Demo | Streamlit + Plotly | `streamlit_app/` | Streamlit Cloud |
+
+---
+
+## Key Features
+
+### Transition Risk
+- Logistic S-curve emission reduction (Bass 1969 diffusion model) per NGFS scenario
+- 8-point NGFS carbon price paths with piecewise linear interpolation (2024-2050)
+- K-ETS free allocation with annual tightening by sector
+- Stranded asset write-downs for utilities and oil & gas (Carbon Tracker 2023)
+- Scope 3 supply-chain exposure (CDP 2023)
+- Scenario-adjusted WACC with credit spread overlays (Battiston et al. 2017)
+- Sector-specific marginal abatement cost curves with technology learning rates
+
+### Physical Risk
+- Gumbel Type I extreme-value flood model (KMA 30-year fit)
+- Poisson-distributed typhoon strikes with HAZUS-MH wind damage curves
+- Chronic heatwave and drought projections (IPCC AR6 WG1 Ch.11 scaling)
+- Sea-level rise (IPCC AR6 WG1 Ch.9)
+- USACE depth-damage functions adapted for Korean industrial facilities
+- Business interruption modeling (Munich Re / Swiss Re)
+- Compound risk aggregation across hazards
+- Optional Open-Meteo API integration for location-specific Gumbel parameter derivation
+
+### ESG Disclosure
+- TCFD (4 pillars, 11 recommendations), ISSB (IFRS S2), KSSB frameworks
+- Maturity-level scoring (1-5 scale) with weighted category aggregation
+- Gap analysis with priority rankings
+- Regulatory deadline tracking (KSSB mandatory 2025, EU CBAM 2026, KSSB full scope 2027)
+
+### Data Coverage
+- 17 Korean industrial facilities across 8 sectors
+- 10 sector parameter sets (including real estate and financial services)
+- Open-Meteo 30-year historical weather data with 1-hour TTL cache
+
+---
+
+## NGFS Scenarios
+
+| Scenario | Warming Path | Carbon Price 2030 (USD) | Carbon Price 2050 (USD) | Reduction Target |
+|----------|-------------|------------------------|------------------------|------------------|
+| Net Zero 2050 | 1.5 C | $130 | $250 | 50% |
+| Below 2 C | ~2 C | $100 | $200 | 40% |
+| Delayed Transition | ~2.5 C (delayed, then sharp) | $90 | $180 | 30% |
+| Current Policies | 3 C+ | $40 | $80 | 15% |
+
+K-ETS pricing paths (KRW/tCO2e) are available for all four scenarios via the `pricing_regime=kets` parameter. Free allocation ratios tighten annually per sector (e.g., steel 97% base with 1.0%p/yr reduction).
+
+---
+
+## Quick Start
+
+### Backend
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Swagger UI available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env.local`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+```bash
+npm run dev
+```
+
+Dashboard available at [http://localhost:3000](http://localhost:3000).
+
+### Streamlit Demo
+
+```bash
+cd streamlit_app
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+The Streamlit app imports backend services directly -- no API server required.
+
+---
+
+## API Reference
+
+Base URL: `/api/v1` -- Interactive documentation at `/docs` (Swagger UI).
+
+### Endpoints
+
+| Method | Path | Description | Key Parameters |
+|--------|------|-------------|---------------|
+| GET | `/api/v1/scenarios` | List all NGFS scenarios | -- |
+| GET | `/api/v1/scenarios/{scenario_id}` | Get scenario details | `scenario_id`: path |
+| GET | `/api/v1/company/facilities` | List facilities | `sector` (optional) |
+| GET | `/api/v1/company/facilities/{facility_id}` | Get facility details | `facility_id`: path |
+| GET | `/api/v1/company/sectors` | List available sectors | -- |
+| GET | `/api/v1/transition-risk/analysis` | Facility-level transition risk | `scenario`, `pricing_regime` |
+| GET | `/api/v1/transition-risk/summary` | Scenario transition summary | `scenario`, `pricing_regime` |
+| GET | `/api/v1/transition-risk/comparison` | Cross-scenario comparison | `pricing_regime` |
+| GET | `/api/v1/physical-risk/assessment` | Physical risk assessment | `scenario`, `year`, `use_api_data` |
+| GET | `/api/v1/esg/assessment` | ESG compliance scoring | `framework` |
+| GET | `/api/v1/esg/disclosure-data` | Disclosure detail data | `framework` |
+| GET | `/api/v1/esg/frameworks` | List ESG frameworks | -- |
+| GET | `/health` | Health check | -- |
+
+### Parameter Reference
+
+| Parameter | Values | Default |
+|-----------|--------|---------|
+| `scenario` | `net_zero_2050`, `below_2c`, `delayed_transition`, `current_policies` | `net_zero_2050` |
+| `pricing_regime` | `global`, `kets` | `global` |
+| `framework` | `tcfd`, `issb`, `kssb` | `tcfd` |
+| `year` | `2025`-`2100` | scenario default |
+| `use_api_data` | `true`, `false` | `false` |
+
+### Example Requests
+
+Transition risk with K-ETS pricing:
+
+```bash
+curl "http://localhost:8000/api/v1/transition-risk/analysis?scenario=net_zero_2050&pricing_regime=kets"
+```
+
+Physical risk for 2040 with Open-Meteo data:
+
+```bash
+curl "http://localhost:8000/api/v1/physical-risk/assessment?scenario=below_2c&year=2040&use_api_data=true"
+```
+
+ESG assessment under KSSB framework:
+
+```bash
+curl "http://localhost:8000/api/v1/esg/assessment?framework=kssb"
+```
+
+---
+
+## Project Structure
+
+```
+climate_risk/
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  # FastAPI entry point, CORS, routers
+│   │   ├── api/v1/
+│   │   │   ├── transition.py        # /transition-risk endpoints
+│   │   │   ├── physical.py          # /physical-risk endpoints
+│   │   │   ├── esg.py               # /esg endpoints
+│   │   │   ├── scenarios.py         # /scenarios endpoints
+│   │   │   └── company.py           # /company endpoints
+│   │   ├── services/
+│   │   │   ├── transition_risk.py   # S-curve, NPV, stranded assets
+│   │   │   ├── physical_risk.py     # Gumbel flood, Poisson typhoon, EAL
+│   │   │   ├── esg_compliance.py    # TCFD/ISSB/KSSB scoring engine
+│   │   │   ├── carbon_pricing.py    # NGFS paths, K-ETS free allocation
+│   │   │   ├── risk_math.py         # WACC, NPV, discount rate utilities
+│   │   │   ├── climate_science.py   # Warming projections, SLR
+│   │   │   └── open_meteo.py        # Historical weather API client
+│   │   ├── models/
+│   │   │   └── schemas.py           # Pydantic v2 response models
+│   │   ├── core/
+│   │   │   └── config.py            # Scenarios, sector params, citations
+│   │   ├── data/
+│   │   │   └── sample_facilities.py # 17 Korean facility records
+│   │   └── tests/
+│   │       └── test_services.py     # 45 unit tests
+│   ├── requirements.txt
+│   └── render.yaml                  # Render.com deployment config
+├── frontend/
+│   ├── src/
+│   │   ├── app/                     # Next.js App Router pages
+│   │   ├── components/              # Layout, charts, tables, ESG
+│   │   ├── lib/                     # API client, utilities
+│   │   └── hooks/                   # Data fetching hooks (SWR)
+│   ├── package.json
+│   └── tailwind.config.ts
+├── streamlit_app/
+│   ├── app.py                       # Dashboard entry point
+│   ├── pages/                       # Multi-page Streamlit views
+│   ├── utils/                       # Formatting helpers
+│   └── requirements.txt
+└── README.md
+```
+
+---
+
+## Methodology
+
+| Model | Method | Key Reference |
+|-------|--------|--------------|
+| Carbon pricing paths | 8-point piecewise linear interpolation | NGFS Phase IV Scenarios (2023) |
+| Emission reduction | Logistic S-curve (Bass diffusion) | Bass (1969); calibrated to NGFS |
+| Marginal abatement cost | Technology-specific MAC with learning rates | IEA ETP 2023, IRENA 2023 |
+| Stranded assets | Annual write-down schedules by sector | Carbon Tracker (2023) |
+| WACC adjustment | Base rate + scenario credit spread | Battiston et al. (2017); NGFS 2023 |
+| Flood risk | Gumbel Type I extreme-value distribution | KMA 30-year analysis (1991-2020) |
+| Typhoon risk | Poisson frequency x HAZUS-MH wind damage | KMA NTC (1951-2023); FEMA HAZUS |
+| Depth-damage curves | USACE adapted for Korean industry | Kim & Lee (2019) |
+| Heatwave / drought | Linear scaling per degree C of warming | IPCC AR6 WG1 Ch.11; K-water |
+| Sea-level rise | IPCC AR6 WG1 Ch.9 projections | IPCC AR6 (2021) |
+| ESG scoring | Weighted maturity model (1-5 scale) | TCFD 2017; ISSB IFRS S2; KSSB |
+
+---
+
+## Facility Coverage
+
+| Sector | Count | Example Facilities |
+|--------|------:|-------------------|
+| Steel | 2 | 포항제철소, 광양제철소 |
+| Petrochemical | 2 | 울산석유화학단지, 여수석유화학단지 |
+| Automotive | 2 | 울산자동차공장, 아산자동차공장 |
+| Electronics | 3 | 화성반도체공장, 평택반도체공장, 구미디스플레이공장 |
+| Utilities | 3 | 당진화력발전소, 태안화력발전소, 영흥화력발전소 |
+| Cement | 2 | 단양시멘트공장, 영월시멘트공장 |
+| Shipping | 1 | 부산항 해운기지 |
+| Oil & Gas | 2 | 울산정유공장, 대산정유공장 |
+| **Total** | **17** | |
+
+---
+
+## Frontend Pages
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Dashboard | `/` | KPI cards, facility map, emission overview |
+| Company Profile | `/company-profile` | Facility inventory, revenue, emissions by scope |
+| Transition Risk | `/transition-risk` | S-curve pathways, cost waterfall, K-ETS toggle |
+| Physical Risk | `/physical-risk` | Hazard cards (flood, typhoon, heatwave, drought, SLR), EAL |
+| ESG Disclosure | `/esg-disclosure` | Framework scoring, gap analysis, regulatory deadlines |
+| Scenario Comparison | `/scenario-comparison` | 4-scenario NPV comparison, risk heatmap |
+| Cashflow Impact | `/cashflow-impact` | DCF-based financial impact (planned -- H2 2026) |
+
+---
+
+## Tech Stack
+
+### Backend
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| FastAPI | 0.115.0 | REST API framework |
+| Pydantic | 2.9.0 | Request/response validation |
+| NumPy | 1.26.4 | Numerical computation |
+| httpx | 0.27.0 | Async HTTP client (Open-Meteo) |
+| uvicorn | 0.30.0 | ASGI server |
+
+### Frontend
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| Next.js | 14.2.35 | React framework (App Router) |
+| React | 18 | UI library |
+| Recharts | 3.7.0 | Chart components |
+| SWR | 2.4.0 | Data fetching and caching |
+| Tailwind CSS | 3.4.1 | Utility-first CSS |
+| Lucide React | 0.569.0 | Icon library |
+| TypeScript | 5 | Type safety |
+
+---
+
+## Testing
+
+```bash
+cd backend
+source venv/bin/activate
+pytest app/tests/test_services.py -v
+```
+
+45 tests covering: carbon pricing interpolation, K-ETS free allocation, transition risk S-curve, physical risk Gumbel/Poisson models, ESG framework scoring, risk math utilities, and climate science projections.
+
+---
+
+## Deployment
+
+### Backend -- Render.com
+
+The backend deploys as a stateless Python web service. Configuration is defined in `backend/render.yaml`:
+
+- Runtime: Python 3.11
+- Build: `pip install -r requirements.txt`
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+### Frontend -- Vercel
+
+The Next.js frontend deploys to Vercel with a single environment variable:
+
+- `NEXT_PUBLIC_API_URL` -- points to the Render backend URL
+
+### Streamlit Demo -- Streamlit Cloud
+
+The Streamlit app imports backend services directly via Python (`from app.services...`), requiring no separate API server. Deploy from the `streamlit_app/` directory.
+
+---
+
+## Roadmap
+
+- [x] NGFS 4-scenario transition risk with S-curve reduction
+- [x] K-ETS pricing regime with free allocation tightening
+- [x] Analytical physical risk model (Gumbel, Poisson, IPCC scaling)
+- [x] Open-Meteo historical weather integration
+- [x] ESG disclosure engine (TCFD / ISSB / KSSB)
+- [x] Next.js dashboard with interactive charts
+- [ ] DCF cashflow impact analysis (H2 2026)
+- [ ] PDF report generation
+- [ ] Multi-company portfolio mode
+- [ ] EU ETS / CBAM cross-border pricing
+- [ ] Docker Compose for local development
+
+---
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 -- see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+- [NGFS](https://www.ngfs.net/) -- Network for Greening the Financial System scenario framework
+- [IPCC AR6](https://www.ipcc.ch/assessment-report/ar6/) -- Physical science basis for climate projections
+- [KMA](https://www.kma.go.kr/) -- Korea Meteorological Administration historical climate data
+- [Carbon Tracker Initiative](https://carbontracker.org/) -- Stranded asset analysis methodology
+- [CDP](https://www.cdp.net/) -- Scope 3 supply-chain emission exposure data
+- [IEA](https://www.iea.org/) / [IRENA](https://www.irena.org/) / [IMO](https://www.imo.org/) -- Sector abatement technology references
+- [Open-Meteo](https://open-meteo.com/) -- Historical weather archive API

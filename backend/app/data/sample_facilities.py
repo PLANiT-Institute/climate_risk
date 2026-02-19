@@ -1,4 +1,25 @@
-"""Sample Korean company facility data for Phase 1."""
+"""Sample Korean company facility data for Phase 1.
+
+Data represents stylized Korean industrial facilities modeled on major
+companies. Financial figures (revenue, EBITDA, assets) are illustrative
+approximations, not actual reported values.
+
+Sources for sector-typical financial ratios:
+- Steel: POSCO 2023 Annual Report (EBITDA margin ~15%)
+- Petrochemical: SK Innovation 2023 (margin ~12%)
+- Automotive: Hyundai Motor 2023 (margin ~12%)
+- Electronics: Samsung Electronics 2023 (margin ~30% for semicon)
+- Utilities: KEPCO/Gencos 2023 (margin ~10% for regulated coal)
+- Cement: Korea Cement Association industry data (margin ~20%)
+- Shipping: HMM 2023 (margin ~12%, varies with freight rates)
+- Oil & Gas: SK Energy 2023 (margin ~7%)
+
+Scope 3 notes:
+- Electronics Scope 3 (~25% of total) may underestimate typical
+  semiconductor supply chain (industry average 30-40%).
+- Automotive Scope 3 (~40% of total) excludes use-phase vehicle
+  emissions which can be 5-10x manufacturing emissions.
+"""
 
 FACILITIES = [
     # ── Steel (포스코형) ──
@@ -153,7 +174,7 @@ FACILITIES = [
         "current_emissions_scope2": 500_000,
         "current_emissions_scope3": 2_200_000,
         "annual_revenue": 8_000_000_000,
-        "ebitda": 1_600_000_000,
+        "ebitda": 800_000_000,       # ~10% margin (KEPCO regulated rate structure)
         "assets_value": 12_000_000_000,
     },
     {
@@ -168,7 +189,7 @@ FACILITIES = [
         "current_emissions_scope2": 400_000,
         "current_emissions_scope3": 1_800_000,
         "annual_revenue": 6_500_000_000,
-        "ebitda": 1_300_000_000,
+        "ebitda": 650_000_000,       # ~10% margin (KEPCO regulated rate structure)
         "assets_value": 9_500_000_000,
     },
     {
@@ -183,7 +204,7 @@ FACILITIES = [
         "current_emissions_scope2": 350_000,
         "current_emissions_scope3": 1_500_000,
         "annual_revenue": 5_200_000_000,
-        "ebitda": 1_040_000_000,
+        "ebitda": 520_000_000,       # ~10% margin (KEPCO regulated rate structure)
         "assets_value": 8_000_000_000,
     },
     # ── Cement ──
@@ -280,3 +301,33 @@ def get_facility_by_id(facility_id: str) -> dict | None:
 
 def get_facilities_by_sector(sector: str) -> list:
     return [f for f in FACILITIES if f["sector"] == sector]
+
+
+def get_company_list() -> list[str]:
+    """Return sorted list of unique company names."""
+    return sorted(set(f["company"] for f in FACILITIES))
+
+
+def get_facilities_by_company(company: str) -> list[dict]:
+    """Return facilities belonging to a specific company."""
+    return [f for f in FACILITIES if f["company"] == company]
+
+
+def get_company_summary(company: str) -> dict:
+    """Aggregate company-level metrics: total emissions, revenue, assets, facility count, sectors."""
+    facs = get_facilities_by_company(company)
+    if not facs:
+        return {}
+    sectors = sorted(set(f["sector"] for f in facs))
+    return {
+        "company": company,
+        "facility_count": len(facs),
+        "sectors": sectors,
+        "primary_sector": sectors[0],
+        "total_scope1": sum(f["current_emissions_scope1"] for f in facs),
+        "total_scope2": sum(f["current_emissions_scope2"] for f in facs),
+        "total_scope3": sum(f["current_emissions_scope3"] for f in facs),
+        "total_revenue": sum(f["annual_revenue"] for f in facs),
+        "total_ebitda": sum(f["ebitda"] for f in facs),
+        "total_assets": sum(f["assets_value"] for f in facs),
+    }

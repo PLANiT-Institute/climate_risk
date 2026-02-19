@@ -14,7 +14,13 @@ from .risk_math import piecewise_linear_interpolate
 
 
 # ── Scenario-to-SSP Mapping ─────────────────────────────────────────
-# Maps internal NGFS-style scenario IDs to IPCC SSP pathways
+# Maps internal NGFS-style scenario IDs to IPCC SSP pathways.
+# NOTE: NGFS and SSP/RCP are independent frameworks. This mapping is a
+# reasonable approximation based on radiative forcing alignment, but is
+# NOT an officially published correspondence. Alternative mappings exist
+# (e.g., NGFS uses its own integrated assessment models). Physical risk
+# results are sensitive to this choice.
+# Reference: NGFS (2023) Technical Documentation, Table 2.1 (scenario archetypes).
 SCENARIO_TO_SSP: Dict[str, str] = {
     "net_zero_2050": "SSP1-1.9",        # Very low emissions
     "below_2c": "SSP1-2.6",             # Low emissions
@@ -45,24 +51,40 @@ SSP_WARMING_PROJECTIONS: Dict[str, Dict[int, float]] = {
 }
 
 # ── Hazard Intensification per degree C of warming ──────────────────
-# Source: IPCC AR6 WG1 Chapter 11, Table 11.1; Fischer & Knutti (2015)
-# Values represent fractional increase per 1 deg C of warming above baseline
+# Source: IPCC AR6 WG1 Chapter 11, Table 11.1; Fischer & Knutti (2015);
+#         Knutson et al. (2020), "Tropical Cyclones and Climate Change
+#         Assessment", BAMS, 100(10), 1987-2007.
+#
+# IMPORTANT LIMITATION: These are global/continental aggregate rates.
+# Korean-specific rates may differ. KMA "한국 기후변화 평가보고서 2020"
+# provides downscaled projections but is not yet integrated.
+# Users should treat outputs as screening-level estimates, not site-specific
+# engineering values.
+#
+# Values represent fractional increase per 1 deg C of warming above baseline.
 HAZARD_INTENSIFICATION_PER_DEGREE: Dict[str, Dict[str, float]] = {
     "flood": {
-        "frequency": 0.30,   # +30% per deg C (Clausius-Clapeyron + hydrological)
-        "intensity": 0.07,   # +7% per deg C (Clausius-Clapeyron for precip)
+        "frequency": 0.30,   # +30% per deg C (IPCC AR6 Table 11.1, global)
+        "intensity": 0.055,  # +5.5% per deg C extreme daily precipitation
+                              # (IPCC AR6 WG1 Ch.8: 5-7% range for daily extremes;
+                              # 7% is theoretical CC maximum for hourly events only)
     },
     "typhoon": {
-        "frequency": 0.05,   # +5% per deg C (modest increase in total count)
+        "frequency": 0.10,   # +10% per deg C (Knutson et al. 2020, Western Pacific
+                              # basin estimate; global average ~5% but WP is higher)
         "intensity": 0.05,   # +5% per deg C in peak wind speed (Knutson et al. 2020)
         "cat45_ratio": 0.13, # +13% per deg C in Cat 4-5 proportion (IPCC AR6)
     },
     "heatwave": {
-        "frequency": 1.30,   # +130% per deg C (days above threshold)
+        "frequency": 0.80,   # +80% per deg C (frequency of days above threshold)
+                              # IPCC AR6 Table 11.1: 2-3x at 2°C globally;
+                              # ~80% per deg C for East Asian mid-latitudes per
+                              # Fischer & Knutti (2015), Table 1. Prior value of
+                              # 130% was global tropical/subtropical aggregate.
         "intensity": 1.0,    # +1.0 deg C per deg C global warming (amplification)
     },
     "drought": {
-        "frequency": 0.15,   # +15% per deg C in drought occurrence
+        "frequency": 0.15,   # +15% per deg C in drought occurrence (IPCC AR6 Ch.11)
         "intensity": 0.10,   # +10% severity per deg C
     },
     "sea_level_rise": {

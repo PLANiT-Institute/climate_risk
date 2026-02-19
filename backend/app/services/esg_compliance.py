@@ -63,6 +63,18 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
     - Score depends on what data/analysis is actually available
     - Not hardcoded; reflects the real state of the platform
 
+    IMPORTANT LIMITATION: These scores measure the analytical capabilities
+    of this platform (multi-scenario analysis, risk quantification, data
+    coverage), NOT the organization's actual governance structure (board
+    committees, ESG expertise, management integration). A formal TCFD/ISSB
+    assessment would additionally require evidence of:
+    - Board-level climate risk oversight committee
+    - Management accountability and expertise
+    - Integration with enterprise risk management (ERM)
+    - External assurance of reported data
+    Scores should be interpreted as "analytical readiness" rather than
+    full regulatory compliance scores.
+
     Returns:
         {category_name: score (0-100)}
     """
@@ -94,14 +106,16 @@ def _compute_data_driven_scores(framework_id: str) -> Dict[str, float]:
         has_physical_model = False
 
     # ── Governance Score ──
+    # NOTE: Governance score reflects analytical infrastructure readiness,
+    # not board-level governance structure (see docstring limitation).
     governance = 0
     if has_multi_scenario:
-        governance += 25   # Scenario analysis capability = governance-level oversight
+        governance += 25   # Scenario analysis capability supports governance oversight
     if has_transition_analysis:
         governance += 25   # Internal carbon pricing / financial impact quantification
     if total_facilities >= 5:
         governance += 15   # Multi-facility monitoring (organizational breadth)
-    # No explicit board committee data → partial
+    # No explicit board committee data → partial (capped below full score)
     governance += 10       # Platform existence = basic climate risk awareness
     governance = min(100, governance)
 
