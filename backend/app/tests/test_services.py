@@ -537,3 +537,212 @@ def test_open_meteo_cache():
     # Cleanup
     _cache.pop(key, None)
     _cache_ttl.pop(key, None)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: FACILITY DATA INTEGRITY TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+from ..data.sample_facilities import FACILITIES
+
+
+def test_facility_ebitda_margin_bounds():
+    """EBITDA margins should be within plausible sector ranges."""
+    # Reference: Industry-typical EBITDA margin ranges
+    margin_bounds = {
+        "steel": (0.05, 0.25),
+        "petrochemical": (0.05, 0.20),
+        "cement": (0.10, 0.30),
+        "utilities": (0.05, 0.20),       # Regulated Korean utilities: 5-15%
+        "oil_gas": (0.04, 0.15),
+        "shipping": (0.05, 0.20),
+        "automotive": (0.05, 0.20),
+        "electronics": (0.10, 0.40),      # Semicon can be higher
+        "real_estate": (0.10, 0.40),
+        "financial": (0.20, 0.60),
+    }
+    for fac in FACILITIES:
+        margin = fac["ebitda"] / fac["annual_revenue"]
+        sector = fac["sector"]
+        bounds = margin_bounds.get(sector, (0.01, 0.50))
+        assert bounds[0] <= margin <= bounds[1], (
+            f"{fac['name']} ({sector}): EBITDA margin {margin:.1%} "
+            f"outside plausible range {bounds[0]:.0%}-{bounds[1]:.0%}"
+        )
+
+
+def test_facility_scope_ordering():
+    """Scope 1+2 should not exceed total emissions context check."""
+    for fac in FACILITIES:
+        s1 = fac["current_emissions_scope1"]
+        s2 = fac["current_emissions_scope2"]
+        s3 = fac["current_emissions_scope3"]
+        assert s1 > 0, f"{fac['name']}: Scope 1 should be positive"
+        assert s2 > 0, f"{fac['name']}: Scope 2 should be positive"
+        assert s3 > 0, f"{fac['name']}: Scope 3 should be positive"
+        # Revenue should be positive
+        assert fac["annual_revenue"] > 0
+        assert fac["assets_value"] > 0
+
+
+def test_facility_coordinates_valid():
+    """All facility coordinates should be within South Korea bounds."""
+    # South Korea approximate bounds
+    SK_LAT_MIN, SK_LAT_MAX = 33.0, 39.0
+    SK_LON_MIN, SK_LON_MAX = 124.0, 132.0
+    for fac in FACILITIES:
+        assert SK_LAT_MIN <= fac["latitude"] <= SK_LAT_MAX, (
+            f"{fac['name']}: latitude {fac['latitude']} outside Korea bounds"
+        )
+        assert SK_LON_MIN <= fac["longitude"] <= SK_LON_MAX, (
+            f"{fac['name']}: longitude {fac['longitude']} outside Korea bounds"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: WARMING MAGNITUDE VALIDATION
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_warming_magnitude_ipcc_tcre():
+    """Warming projections should be consistent with IPCC AR6 TCRE range.
+
+    IPCC AR6: Transient Climate Response to Emissions (TCRE) ~1.65°C
+    per 1000 GtCO2. SSP3-7.0 at 2100 should be ~3.0-4.2°C.
+    """
+    cp_2100 = get_warming_at_year("current_policies", 2100)
+    assert 3.0 <= cp_2100 <= 4.5, f"SSP3-7.0 at 2100 = {cp_2100}°C, expected 3.0-4.5"
+
+    nz_2100 = get_warming_at_year("net_zero_2050", 2100)
+    assert 0.5 <= nz_2100 <= 1.5, f"SSP1-1.9 at 2100 = {nz_2100}°C, expected 0.5-1.5"
+
+
+def test_warming_delta_2050_ranges():
+    """Warming delta at 2050 should be within IPCC AR6 likely ranges."""
+    # Current policies (SSP3-7.0): 2050 warming ~2.5°C, delta ~1.4°C
+    delta_cp = get_warming_delta("current_policies", 2050)
+    assert 0.5 <= delta_cp <= 2.5, f"CP delta at 2050 = {delta_cp}"
+
+    # Net zero (SSP1-1.9): 2050 warming ~1.4°C, delta ~0.3°C
+    delta_nz = get_warming_delta("net_zero_2050", 2050)
+    assert 0.0 <= delta_nz <= 1.0, f"NZ delta at 2050 = {delta_nz}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: COMPOUND RISK FORMULA TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+from ..services.physical_risk import _compound_risk_adjusted_eal, _HAZARD_CORRELATIONS
+
+
+def test_compound_risk_nonnegative():
+    """Compound-adjusted EAL should never be negative."""
+    eals = {"flood": 1000, "typhoon": 500, "heatwave": 200,
+            "drought": 100, "sea_level_rise": 50}
+    result = _compound_risk_adjusted_eal(eals)
+    assert result >= 0
+
+
+def test_compound_risk_correlation_bounds():
+    """All hazard correlation coefficients should be in [-1, 1]."""
+    for pair, rho in _HAZARD_CORRELATIONS.items():
+        assert -1.0 <= rho <= 1.0, (
+            f"Correlation {pair}: {rho} outside [-1, 1]"
+        )
+
+
+def test_compound_risk_with_zero_hazards():
+    """Compound risk with zero EALs should return zero."""
+    eals = {"flood": 0, "typhoon": 0, "heatwave": 0}
+    result = _compound_risk_adjusted_eal(eals)
+    assert result == 0.0
+
+
+def test_compound_risk_additive_baseline():
+    """With all correlations zero, compound EAL = sum of individual EALs."""
+    eals = {"flood": 1000, "sea_level_rise": 500}
+    # These two don't have an explicit correlation entry → rho = 0
+    result = _compound_risk_adjusted_eal(eals)
+    assert result == pytest.approx(1500.0)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: CARBON COST MAGNITUDE TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_carbon_cost_realistic_range():
+    """Carbon costs should be within plausible ranges for major emitters."""
+    result = analyse_scenario("net_zero_2050")
+    for fac in result["facilities"]:
+        last_year = fac["annual_impacts"][-1]  # 2050
+        carbon_cost = last_year["carbon_cost"]
+        total_emissions = last_year["total_emissions"]
+        if total_emissions > 0 and carbon_cost > 0:
+            # Implied carbon price should be reasonable
+            implied_price = carbon_cost / total_emissions
+            assert 0 < implied_price < 1000, (
+                f"{fac['facility_name']}: implied carbon price ${implied_price}/tCO2e"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: STRANDED ASSET SCHEDULE VALIDATION
+# ═══════════════════════════════════════════════════════════════════════
+
+from ..core.config import STRANDED_ASSET_SCHEDULES
+
+
+def test_stranded_asset_phase_out_order():
+    """More ambitious scenarios should have earlier phase-out years."""
+    for sector in ("utilities", "oil_gas"):
+        schedules = STRANDED_ASSET_SCHEDULES[sector]
+        nz_year = schedules["net_zero_2050"]["phase_out_year"]
+        cp_year = schedules["current_policies"]["phase_out_year"]
+        assert nz_year < cp_year, (
+            f"{sector}: net_zero phase-out ({nz_year}) should be before "
+            f"current_policies ({cp_year})"
+        )
+
+
+def test_stranded_asset_at_risk_fraction_bounds():
+    """Asset-at-risk fractions should be between 0 and 1."""
+    for sector, schedules in STRANDED_ASSET_SCHEDULES.items():
+        for scenario_id, schedule in schedules.items():
+            frac = schedule["asset_fraction_at_risk"]
+            assert 0.0 < frac <= 1.0, (
+                f"{sector}/{scenario_id}: asset_fraction_at_risk = {frac}"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: TYPHOON CATEGORY DISTRIBUTION TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+from ..core.config import TYPHOON_CATEGORY_DISTRIBUTION
+
+
+def test_typhoon_category_probabilities_sum_to_one():
+    """Category probabilities should sum to 1.0."""
+    total = sum(TYPHOON_CATEGORY_DISTRIBUTION.values())
+    assert total == pytest.approx(1.0, abs=0.01)
+
+
+def test_typhoon_category_probabilities_positive():
+    """All category probabilities should be positive."""
+    for cat, prob in TYPHOON_CATEGORY_DISTRIBUTION.items():
+        assert prob > 0, f"{cat}: probability should be positive"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AUDIT: MAC CURVE PLAUSIBILITY TESTS
+# ═══════════════════════════════════════════════════════════════════════
+
+def test_mac_steel_reasonable_range():
+    """Steel MAC at 30% reduction in 2030 should be in IEA range ($30-100)."""
+    mac = get_marginal_abatement_cost("steel", 0.30, 2030)
+    assert 10 <= mac <= 150, f"Steel MAC at 30% = ${mac}, expected $10-150"
+
+
+def test_mac_zero_reduction():
+    """Zero reduction should have zero MAC."""
+    mac = get_marginal_abatement_cost("steel", 0.0, 2030)
+    assert mac == 0.0

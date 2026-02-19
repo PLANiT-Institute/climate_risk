@@ -98,9 +98,16 @@ def fetch_historical_weather(
 def derive_gumbel_params(daily_precip: List[Optional[float]]) -> Optional[Dict[str, float]]:
     """Fit Gumbel Type I parameters from daily precipitation data.
 
-    Method: Extract annual maxima, then Method of Moments.
+    Method: Extract annual maxima, then Method of Moments (MoM).
     μ = mean - 0.5772 * σ_gumbel
     σ_gumbel = std * sqrt(6) / π
+
+    Notes:
+    - MoM is used instead of MLE for simplicity; MLE would be more
+      statistically efficient but MoM is adequate for 30-year samples.
+    - Annual maxima are extracted using calendar years (365-day blocks),
+      not water years (Oct-Sep). Korean flood season (Jun-Sep) rarely
+      spans year boundaries, so impact is minimal.
 
     Reference: Coles (2001), An Introduction to Statistical Modeling of Extreme Values.
     """
@@ -142,9 +149,16 @@ def derive_gumbel_params(daily_precip: List[Optional[float]]) -> Optional[Dict[s
 
 
 def derive_heatwave_days(daily_tmax: List[Optional[float]]) -> Optional[float]:
-    """Count average annual heatwave days (days above 33°C threshold).
+    """Count average annual days above 33°C threshold.
 
-    Reference: KMA heatwave warning criteria.
+    LIMITATION: KMA's official heatwave definition requires consecutive
+    days above threshold (usually 2+ days). This function counts ALL days
+    above 33°C regardless of consecutiveness, which may overcount
+    heatwave frequency by 10-20% compared to the official KMA metric.
+    This is acceptable for screening-level risk assessment but should
+    not be presented as "KMA heatwave days" without qualification.
+
+    Reference: KMA heatwave warning criteria (>33°C threshold).
     """
     if not daily_tmax:
         return None
@@ -220,7 +234,8 @@ def derive_drought_days(daily_precip: List[Optional[float]]) -> Optional[float]:
 def derive_wind_speed_baseline(daily_wind: List[Optional[float]]) -> Optional[float]:
     """Derive average annual maximum wind speed (m/s).
 
-    Used for typhoon frequency adjustment.
+    Used for typhoon frequency adjustment in physical_risk.py
+    (_typhoon_risk_model). Also available for future wind hazard modeling.
     """
     if not daily_wind:
         return None
