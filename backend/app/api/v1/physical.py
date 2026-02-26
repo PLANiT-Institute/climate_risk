@@ -1,9 +1,11 @@
 """Physical risk endpoints with scenario/year parameters."""
 
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
 
 from ...services.physical_risk import assess_physical_risk
+from ...models.schemas import FacilityIn
 
 router = APIRouter()
 
@@ -31,4 +33,20 @@ def physical_risk_assessment(
     if year is not None:
         kwargs["year"] = year
     kwargs["use_api_data"] = use_api_data
+    return assess_physical_risk(**kwargs)
+
+class SimulateRequest(BaseModel):
+    scenario: Optional[str] = "current_policies"
+    year: Optional[int] = 2030
+    use_api_data: bool = True
+    facilities: List[FacilityIn]
+
+@router.post("/simulate")
+def physical_risk_simulate(payload: SimulateRequest):
+    kwargs = {
+        "scenario_id": payload.scenario,
+        "year": payload.year,
+        "use_api_data": payload.use_api_data,
+        "facilities": [f.model_dump() for f in payload.facilities]
+    }
     return assess_physical_risk(**kwargs)

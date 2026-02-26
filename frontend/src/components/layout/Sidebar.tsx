@@ -10,8 +10,10 @@ import {
   FileCheck,
   Building2,
   Banknote,
+  FileUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePartner } from "@/hooks/usePartner";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -29,7 +31,10 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "",
-    items: [{ href: "/", label: "대시보드", icon: LayoutDashboard }],
+    items: [
+      { href: "/", label: "대시보드", icon: LayoutDashboard },
+      { href: "/upload", label: "데이터 등록", icon: FileUp, badge: "Custom" },
+    ],
   },
   {
     label: "Stage 1 · 기초 분석",
@@ -59,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { partnerId, companyName } = usePartner();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-60 flex-col bg-slate-800 text-slate-200">
@@ -111,7 +117,14 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-700 px-5 py-3">
-        <p className="text-[10px] text-slate-500">Stage 1-2 제공 중 &middot; Sample Data</p>
+        {partnerId ? (
+          <div>
+            <p className="text-[10px] font-semibold text-amber-400 capitalize">{companyName}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">커스텀 세션 활성화됨</p>
+          </div>
+        ) : (
+          <p className="text-[10px] text-slate-500">Stage 1-2 제공 중 &middot; Sample Data</p>
+        )}
       </div>
     </aside>
   );

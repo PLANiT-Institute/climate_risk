@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { apiUrl, swrFetcher } from "@/lib/api";
+import { usePartner } from "./usePartner";
 import type {
   Scenario,
   Facility,
@@ -14,62 +15,81 @@ import type {
 
 const opts = { revalidateOnFocus: false };
 
+function buildUrl(basePath: string, partnerId: string | null) {
+  if (partnerId) {
+    return apiUrl(`/api/v1/partner/sessions/${partnerId}${basePath}`);
+  }
+  return apiUrl(`/api/v1${basePath}`);
+}
+
 export function useScenarios() {
   return useSWR<Scenario[]>(apiUrl("/api/v1/scenarios"), swrFetcher, opts);
 }
 
+export function useESGFrameworks() {
+  return useSWR<ESGFramework[]>(apiUrl("/api/v1/esg/frameworks"), swrFetcher, opts);
+}
+
 export function useFacilities() {
-  return useSWR<Facility[]>(apiUrl("/api/v1/company/facilities"), swrFetcher, opts);
+  const { partnerId } = usePartner();
+  // Partner root for facilities is different: /api/v1/partner/sessions/{pid}/facilities
+  return useSWR<Facility[]>(
+    buildUrl(partnerId ? "/facilities" : "/company/facilities", partnerId),
+    swrFetcher,
+    opts
+  );
 }
 
 export function useTransitionAnalysis(scenario: string, pricingRegime: string = "global") {
+  const { partnerId } = usePartner();
   return useSWR<TransitionRiskAnalysis>(
-    apiUrl(`/api/v1/transition-risk/analysis?scenario=${scenario}&pricing_regime=${pricingRegime}`),
+    buildUrl(`/transition-risk/analysis?scenario=${scenario}&pricing_regime=${pricingRegime}`, partnerId),
     swrFetcher,
     opts,
   );
 }
 
 export function useTransitionSummary(scenario: string, pricingRegime: string = "global") {
+  const { partnerId } = usePartner();
   return useSWR<TransitionRiskSummary>(
-    apiUrl(`/api/v1/transition-risk/summary?scenario=${scenario}&pricing_regime=${pricingRegime}`),
+    buildUrl(`/transition-risk/summary?scenario=${scenario}&pricing_regime=${pricingRegime}`, partnerId),
     swrFetcher,
     opts,
   );
 }
 
 export function useTransitionComparison(pricingRegime: string = "global") {
+  const { partnerId } = usePartner();
   return useSWR<ScenarioComparison>(
-    apiUrl(`/api/v1/transition-risk/comparison?pricing_regime=${pricingRegime}`),
+    buildUrl(`/transition-risk/comparison?pricing_regime=${pricingRegime}`, partnerId),
     swrFetcher,
     opts,
   );
 }
 
 export function usePhysicalRisk(useApiData: boolean = false) {
+  const { partnerId } = usePartner();
   return useSWR<PhysicalRiskAssessment>(
-    apiUrl(`/api/v1/physical-risk/assessment?use_api_data=${useApiData}`),
+    buildUrl(`/physical-risk/assessment?use_api_data=${useApiData}`, partnerId),
     swrFetcher,
     opts,
   );
 }
 
 export function useESGAssessment(framework: string) {
+  const { partnerId } = usePartner();
   return useSWR<ESGAssessment>(
-    apiUrl(`/api/v1/esg/assessment?framework=${framework}`),
+    buildUrl(`/esg/assessment?framework=${framework}`, partnerId),
     swrFetcher,
     opts,
   );
 }
 
 export function useESGDisclosure(framework: string) {
+  const { partnerId } = usePartner();
   return useSWR<ESGDisclosureData>(
-    apiUrl(`/api/v1/esg/disclosure-data?framework=${framework}`),
+    buildUrl(`/esg/disclosure-data?framework=${framework}`, partnerId),
     swrFetcher,
     opts,
   );
-}
-
-export function useESGFrameworks() {
-  return useSWR<ESGFramework[]>(apiUrl("/api/v1/esg/frameworks"), swrFetcher, opts);
 }

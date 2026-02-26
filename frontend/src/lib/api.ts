@@ -33,6 +33,27 @@ export const fetchPhysicalRisk = (useApiData: boolean = false) =>
     `/api/v1/physical-risk/assessment?use_api_data=${useApiData}`
   );
 
+export const simulatePhysicalRisk = async (
+  payload: {
+    scenario: string;
+    year: number;
+    use_api_data: boolean;
+    facilities: Facility[];
+  },
+  partnerId?: string | null,
+) => {
+  const url = partnerId
+    ? apiUrl(`/api/v1/partner/sessions/${partnerId}/physical-risk/simulate`)
+    : apiUrl("/api/v1/physical-risk/simulate");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("분석 시뮬레이션 중 오류가 발생했습니다.");
+  return res.json() as Promise<PhysicalRiskAssessment>;
+};
+
 // ── ESG ──
 export const fetchESGAssessment = (framework: string) =>
   fetcher<ESGAssessment>(`/api/v1/esg/assessment?framework=${framework}`);

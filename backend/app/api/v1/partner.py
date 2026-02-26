@@ -1,16 +1,19 @@
 """Partner API: external companies submit facility data and run analyses."""
 
 import time
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from ...core.config import SCENARIOS, get_sector_warnings
-from ...models.schemas import PartnerSessionCreate, PartnerSessionOut
+from ...models.schemas import FacilityIn, PartnerSessionCreate, PartnerSessionOut
 from ...services import partner_store
 from ...services.transition_risk import analyse_scenario, get_summary, compare_scenarios
 from ...services.physical_risk import assess_physical_risk
 from ...services.esg_compliance import assess_framework, get_disclosure_data
+from ...services.report_generator import generate_disclosure_excel
 
 router = APIRouter()
 
@@ -156,6 +159,25 @@ def partner_physical_risk(
     return assess_physical_risk(**kwargs)
 
 
+class PartnerSimulateRequest(BaseModel):
+    scenario: Optional[str] = "current_policies"
+    year: Optional[int] = 2030
+    use_api_data: bool = True
+    facilities: List[FacilityIn]
+
+
+@router.post("/sessions/{partner_id}/physical-risk/simulate")
+def partner_physical_risk_simulate(partner_id: str, payload: PartnerSimulateRequest):
+    """Run physical risk simulation with custom facility coordinates."""
+    _get_partner_facilities(partner_id)  # session access control
+    return assess_physical_risk(
+        scenario_id=payload.scenario,
+        year=payload.year,
+        use_api_data=payload.use_api_data,
+        facilities=[f.model_dump() for f in payload.facilities],
+    )
+
+
 # ── ESG Assessment ────────────────────────────────────────────────────
 
 @router.get("/sessions/{partner_id}/esg/assessment")
@@ -176,3 +198,25 @@ def partner_esg_disclosure(
     _validate_framework(framework)
     facilities = _get_partner_facilities(partner_id)
     return get_disclosure_data(framework, facilities=facilities)
+
+
+@router.get("/sessions/{partner_id}/esg/reports/disclosure")
+def partner_disclosure_report(
+    partner_id: str,
+    framework: str = Query("kssb"),
+    scenario: str = Query("net_zero_2050"),
+    pricing_regime: str = Query("global"),
+    year: int = Query(2030, ge=2025, le=2100),
+):
+    """Download Excel disclosure report for a partner session."""
+    _validate_framework(framework)
+    _validate_scenario(scenario)
+    _validate_pricing_regime(pricing_regime)
+    facilities = _get_partner_facilities(partner_id)
+    buf = generate_disclosure_excel(framework, scenario, pricing_regime, year, facilities)
+    filename = f"climate_disclosure_{framework}_{scenario}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
