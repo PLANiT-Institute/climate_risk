@@ -7,6 +7,11 @@ Global sidebar: company / scenario / pricing regime / year.
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import sys
+import os
+
+# Add parent directory to path so we can import backend services
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend")))
 
 from utils.helpers import (
     format_currency, format_emissions, default_layout,

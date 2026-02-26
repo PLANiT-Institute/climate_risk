@@ -11,6 +11,7 @@ import {
   BarChart3,
   Calendar,
   ArrowRight,
+  Download,
 } from "lucide-react";
 import LoadingCard from "@/components/dashboard/LoadingCard";
 import ESGRadarChart from "@/components/charts/ESGRadarChart";
@@ -19,7 +20,10 @@ import MaturityGauge from "@/components/esg/MaturityGauge";
 import CategoryScoreCard from "@/components/esg/CategoryScoreCard";
 import ComplianceStats from "@/components/esg/ComplianceStats";
 import MetricsDashboard from "@/components/esg/MetricsDashboard";
+import GuidelineMapper from "@/components/esg/GuidelineMapper";
 import { useESGAssessment, useESGDisclosure, useESGFrameworks } from "@/hooks/useClimateData";
+import { usePartner } from "@/hooks/usePartner";
+import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { GapAnalysisItem, RegulatoryDeadline } from "@/lib/api";
 
@@ -69,9 +73,39 @@ function daysUntil(dateStr: string): number {
 
 export default function ESGDisclosurePage() {
   const [framework, setFramework] = useState("tcfd");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { partnerId } = usePartner();
   const { data: frameworks } = useESGFrameworks();
   const { data: assessment, isLoading: loadA } = useESGAssessment(framework);
   const { data: disclosure, isLoading: loadD } = useESGDisclosure(framework);
+
+  const handleDownloadReport = async () => {
+    setIsDownloading(true);
+    try {
+      const params = new URLSearchParams({
+        framework,
+        scenario: "net_zero_2050",
+        pricing_regime: "global",
+        year: "2030",
+      });
+      const url = partnerId
+        ? apiUrl(`/api/v1/partner/sessions/${partnerId}/esg/reports/disclosure?${params}`)
+        : apiUrl(`/api/v1/esg/reports/disclosure?${params}`);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("보고서 생성 실패");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `climate_disclosure_${framework}_net_zero_2050.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error(err);
+      alert("보고서 다운로드 중 오류가 발생했습니다.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   if (loadA || loadD) {
     return (
@@ -132,7 +166,36 @@ export default function ESGDisclosurePage() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-400">{FRAMEWORK_DESC[framework]}</p>
+        <p className="text-xs text-slate-400 mb-6">{FRAMEWORK_DESC[framework]}</p>
+        <GuidelineMapper framework={framework} />
+
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-blue-900">
+              공시 보고서 다운로드
+            </h3>
+            <p className="text-xs text-blue-600 mt-0.5">
+              {framework.toUpperCase()} 프레임워크 기반 Excel 보고서 (8개 시트)
+            </p>
+          </div>
+          <button
+            onClick={handleDownloadReport}
+            disabled={isDownloading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isDownloading ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Excel 다운로드
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Score Gauge + Maturity + Compliance Stats */}
