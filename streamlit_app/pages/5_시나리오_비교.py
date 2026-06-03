@@ -12,6 +12,9 @@ from utils.company_data import get_cached_comparison, filter_comparison_by_compa
 
 st.set_page_config(page_title="시나리오 비교", page_icon="📈", layout="wide")
 
+from components.sidebar import render_global_sidebar
+render_global_sidebar()
+
 # ── Read global sidebar state ──
 company = st.session_state.get("global_company", "K-Steel Corp")
 pricing_regime = st.session_state.get("global_pricing", "kets")

@@ -25,6 +25,7 @@ from utils.company_data import (
 from app.data.sample_facilities import (
     get_all_facilities, get_company_list, get_facilities_by_company, get_company_summary,
 )
+from components.sidebar import render_global_sidebar
 
 st.set_page_config(
     page_title="기후리스크 공시 도구",
@@ -33,43 +34,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global Sidebar ──────────────────────────────────────────────────
-companies = get_company_list()
+render_global_sidebar()
 
-with st.sidebar:
-    st.markdown("### 기후리스크 공시 도구")
-    st.divider()
-
-    company = st.selectbox(
-        "기업 선택",
-        options=companies,
-        format_func=lambda c: COMPANY_NAMES_KR.get(c, c),
-        key="global_company",
-    )
-    scenario_id = st.selectbox(
-        "NGFS 시나리오",
-        options=["net_zero_2050", "below_2c", "delayed_transition", "current_policies"],
-        format_func=lambda x: SCENARIO_NAMES.get(x, x),
-        key="global_scenario",
-    )
-    pricing_regime = st.radio(
-        "탄소가격 체계",
-        options=["kets", "global"],
-        format_func=lambda x: "K-ETS (한국 배출권거래제)" if x == "kets" else "글로벌 탄소가격",
-        key="global_pricing",
-    )
-    year = st.slider(
-        "평가 연도",
-        min_value=2025, max_value=2050, value=2030, step=5,
-        key="global_year",
-    )
-
-    st.divider()
-    st.caption("Backend: FastAPI analytical services (direct import)")
-    st.caption("Model: analytical_v1")
-
-# ── Persist selections in session_state (already done via key=) ──
-# Other pages read: st.session_state.global_company, etc.
+# ── Read sidebar selections ──────────────────────────────────────────
+company = st.session_state.get("global_company", get_company_list()[0])
+scenario_id = st.session_state.get("global_scenario", "net_zero_2050")
+pricing_regime = st.session_state.get("global_pricing", "kets")
+year = st.session_state.get("global_year", 2030)
 
 # ── Company Info ────────────────────────────────────────────────────
 summary = get_company_summary(company)

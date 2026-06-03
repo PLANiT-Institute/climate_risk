@@ -17,6 +17,9 @@ from utils.company_data import get_cached_esg, get_cached_disclosure
 
 st.set_page_config(page_title="ESG 공시", page_icon="📋", layout="wide")
 
+from components.sidebar import render_global_sidebar
+render_global_sidebar()
+
 # ── Read global sidebar state ──
 company = st.session_state.get("global_company", "K-Steel Corp")
 

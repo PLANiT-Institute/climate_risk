@@ -13,6 +13,9 @@ from utils.company_data import get_cached_physical, filter_physical_by_company
 
 st.set_page_config(page_title="물리적 리스크", page_icon="🌊", layout="wide")
 
+from components.sidebar import render_global_sidebar
+render_global_sidebar()
+
 # ── Read global sidebar state ──
 company = st.session_state.get("global_company", "K-Steel Corp")
 scenario_id = st.session_state.get("global_scenario", "net_zero_2050")

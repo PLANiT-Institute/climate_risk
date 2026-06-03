@@ -24,6 +24,9 @@ from app.data.sample_facilities import get_company_summary, get_facilities_by_co
 
 st.set_page_config(page_title="공시 보고서", page_icon="📑", layout="wide")
 
+from components.sidebar import render_global_sidebar
+render_global_sidebar()
+
 # ── Read global sidebar state ──
 company = st.session_state.get("global_company", "K-Steel Corp")
 scenario_id = st.session_state.get("global_scenario", "net_zero_2050")
