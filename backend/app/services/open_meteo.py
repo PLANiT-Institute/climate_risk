@@ -26,6 +26,9 @@ _TIMEOUT = 30.0  # seconds
 _MIN_YEARS = 5  # minimum years of data required
 _HEATWAVE_THRESHOLD_C = 33.0  # KMA heatwave definition
 
+# Inter-request delay to avoid 429 rate limits (seconds)
+_INTER_REQUEST_DELAY = 1.0
+
 # ── In-Memory Cache (1-hour TTL, ~1km grouping) ──────────────────────
 _cache: Dict[str, dict] = {}
 _cache_ttl: Dict[str, float] = {}
@@ -33,6 +36,24 @@ _CACHE_TTL_SECONDS = 3600.0  # 1 hour
 
 # Cache statistics (reset per process lifetime)
 _cache_stats: Dict[str, int] = {"hits": 0, "misses": 0}
+
+# ── Rate-limit state (module-level, process lifetime) ─────────────────
+# Once a 429 is received, skip all further API calls in this session.
+# Cache hits are still served normally — only new HTTP requests are blocked.
+_rate_limited: bool = False
+_rate_limited_at: Optional[float] = None  # timestamp of first 429
+
+
+def is_rate_limited() -> bool:
+    """Return True if a 429 was received during this process lifetime."""
+    return _rate_limited
+
+
+def reset_rate_limit() -> None:
+    """Clear the rate-limit flag (use for testing or manual recovery)."""
+    global _rate_limited, _rate_limited_at
+    _rate_limited = False
+    _rate_limited_at = None
 
 
 def _cache_key(lat: float, lon: float, start_date: str, end_date: str, variables: str) -> str:
@@ -76,8 +97,10 @@ def fetch_historical_weather(
     Returns:
         {"temperature_2m_max": [...], "precipitation_sum": [...],
          "wind_speed_10m_max": [...], "time": [...]}
-        or None on failure.
+        or None on failure. Sets module-level _rate_limited=True on HTTP 429.
     """
+    global _rate_limited, _rate_limited_at
+
     params = {
         "latitude": round(lat, 2),
         "longitude": round(lon, 2),
@@ -90,6 +113,15 @@ def fetch_historical_weather(
     try:
         with httpx.Client(timeout=_TIMEOUT) as client:
             resp = client.get(_API_BASE, params=params)
+            if resp.status_code == 429:
+                _rate_limited = True
+                _rate_limited_at = time.time()
+                logger.warning(
+                    "Open-Meteo 429 rate limit hit for (%s, %s) — "
+                    "all further API calls will use static_config this session",
+                    lat, lon,
+                )
+                return None
             resp.raise_for_status()
             data = resp.json()
 
@@ -105,7 +137,17 @@ def fetch_historical_weather(
             "time": daily.get("time", []),
         }
 
-    except (httpx.HTTPError, httpx.TimeoutException, Exception) as e:
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            _rate_limited = True
+            _rate_limited_at = time.time()
+            logger.warning(
+                "Open-Meteo 429 rate limit hit for (%s, %s): %s", lat, lon, e
+            )
+        else:
+            logger.warning("Open-Meteo API error for (%s, %s): %s", lat, lon, e)
+        return None
+    except (httpx.TimeoutException, Exception) as e:
         logger.warning("Open-Meteo API error for (%s, %s): %s", lat, lon, e)
         return None
 
@@ -301,6 +343,17 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
         if "_cache_meta" in result_cached:
             result_cached["_cache_meta"] = {**result_cached["_cache_meta"], "cache_hit": True}
         return result_cached
+
+    # Skip HTTP call if rate-limited this session — use cache only
+    if _rate_limited:
+        logger.debug(
+            "get_api_derived_baselines: skipping API call for (%s, %s) — rate limited",
+            lat, lon,
+        )
+        return None
+
+    # Throttle requests to avoid triggering rate limits
+    time.sleep(_INTER_REQUEST_DELAY)
 
     weather = fetch_historical_weather(lat, lon)
     if weather is None:

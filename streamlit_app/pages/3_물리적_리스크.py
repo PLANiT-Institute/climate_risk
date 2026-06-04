@@ -54,6 +54,43 @@ st.info(
     icon="ℹ️",
 )
 
+# ── API Fallback Summary (rate-limit or API error) ────────────────────
+_all_fac_warnings = [
+    (f["facility_name"], w)
+    for f in facs
+    for w in f.get("api_warnings", [])
+]
+_rate_limit_hits = [
+    (name, w) for name, w in _all_fac_warnings if "429" in w or "요청 제한" in w
+]
+_api_error_hits = [
+    (name, w) for name, w in _all_fac_warnings
+    if w not in [w2 for _, w2 in _rate_limit_hits]
+]
+
+if _rate_limit_hits:
+    st.warning(
+        f"**Open-Meteo 요청 제한(429) 발생** — "
+        f"{len({n for n, _ in _rate_limit_hits})}개 시설의 일부 hazard가 "
+        "정적 권역 기반 값으로 대체되었습니다. "
+        "아래 표에서 영향받은 시설과 hazard를 확인하세요.",
+        icon="⚠️",
+    )
+    _df_rl = pd.DataFrame(_rate_limit_hits, columns=["시설명", "내용"])
+    _df_rl_agg = (
+        _df_rl.groupby("시설명")["내용"]
+        .apply(lambda xs: ", ".join(x.split(":")[0] for x in xs))
+        .reset_index()
+        .rename(columns={"내용": "영향 hazard"})
+    )
+    st.dataframe(_df_rl_agg, use_container_width=True, hide_index=True)
+elif _api_error_hits:
+    st.warning(
+        f"**API 오류** — {len({n for n, _ in _api_error_hits})}개 시설의 일부 hazard가 "
+        "정적 권역 기반 값으로 대체되었습니다.",
+        icon="⚠️",
+    )
+
 st.divider()
 
 # ── Risk Map ──

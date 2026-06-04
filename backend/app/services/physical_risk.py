@@ -55,7 +55,7 @@ from .climate_science import (
     get_hazard_intensity_multiplier,
     get_sea_level_rise_mm,
 )
-from .open_meteo import get_api_derived_baselines
+from .open_meteo import get_api_derived_baselines, is_rate_limited
 
 HAZARD_TYPES = ["flood", "typhoon", "heatwave", "drought", "sea_level_rise"]
 
@@ -610,9 +610,16 @@ def assess_physical_risk(
         # fell back to static_config despite the API being requested.
         api_warnings: List[str] = []
         if use_api_data:
+            rate_limited_now = is_rate_limited()
             for h in hazards:
                 if h.get("data_source") == "static_config":
-                    msg = f"{h['hazard_type']}: API unavailable, using static_config"
+                    if rate_limited_now:
+                        msg = (
+                            f"{h['hazard_type']}: Open-Meteo 요청 제한(429) — "
+                            "정적 권역 기반 값 사용"
+                        )
+                    else:
+                        msg = f"{h['hazard_type']}: API unavailable, using static_config"
                     api_warnings.append(msg)
                     logger.warning(
                         "assess_physical_risk: facility %s — %s",
