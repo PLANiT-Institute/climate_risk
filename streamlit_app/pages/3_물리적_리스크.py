@@ -68,7 +68,7 @@ df_map = pd.DataFrame([{
     "total_eal": f["total_expected_annual_loss"],
 } for f in facs])
 
-fig_map = px.scatter_map(
+fig_map = px.scatter_mapbox(
     df_map,
     lat="latitude",
     lon="longitude",
@@ -80,7 +80,7 @@ fig_map = px.scatter_map(
     size_max=25,
     zoom=6,
     center={"lat": df_map["latitude"].mean(), "lon": df_map["longitude"].mean()},
-    map_style="carto-positron",
+    mapbox_style="carto-positron",
 )
 default_layout(fig_map, height=500)
 fig_map.update_layout(margin=dict(l=0, r=0, t=0, b=0))
