@@ -111,7 +111,17 @@ fac_names = [f["facility_name"] for f in facs]
 selected_name = st.selectbox("시설 선택", fac_names)
 selected = next(f for f in facs if f["facility_name"] == selected_name)
 
-hazards = selected["hazards"]
+# Strip any internal bookkeeping keys that the API layer may attach to hazard
+# dicts (e.g. _cache_meta, _api_status from open_meteo.get_api_derived_baselines).
+# These should not be present in hazard dicts per the current backend, but this
+# guard ensures backward and forward compatibility if the schema ever drifts.
+_INTERNAL_KEYS = {"_cache_meta", "_api_status"}
+
+def _clean_hazard(h: dict) -> dict:
+    """Return a copy of hazard dict with internal underscore keys removed."""
+    return {k: v for k, v in h.items() if k not in _INTERNAL_KEYS}
+
+hazards = [_clean_hazard(h) for h in selected["hazards"]]
 
 # ── API Warnings ──────────────────────────────────────────────────────
 _fac_warnings = selected.get("api_warnings", [])
@@ -193,6 +203,7 @@ hazard_labels = {
 agg = {ht: 0 for ht in hazard_types}
 for f in facs:
     for h in f["hazards"]:
+        h = _clean_hazard(h)
         if h["hazard_type"] in agg:
             agg[h["hazard_type"]] += h["potential_loss"]
 
