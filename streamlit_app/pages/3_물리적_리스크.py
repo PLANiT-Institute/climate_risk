@@ -46,6 +46,14 @@ with col3:
 with col4:
     st.metric("온난화", f'+{result["warming_above_preindustrial"]:.1f}°C')
 
+st.info(
+    "**데이터 소스 안내** | "
+    "홍수·폭염·가뭄: 자산 좌표 기반 ERA5 기후 데이터 (Open-Meteo) 사용 — "
+    "태풍·해수면 상승: 정적 권역 기반 모델 사용 (API 경로 미구현). "
+    "두 유형은 데이터 출처가 다르므로 결과 비교 시 유의하세요.",
+    icon="ℹ️",
+)
+
 st.divider()
 
 # ── Risk Map ──
