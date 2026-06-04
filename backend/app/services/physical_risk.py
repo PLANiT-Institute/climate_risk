@@ -560,7 +560,7 @@ def _compound_risk_adjusted_eal(hazard_eals: Dict[str, float]) -> float:
 def assess_physical_risk(
     scenario_id: str = "current_policies",
     year: int = 2030,
-    use_api_data: bool = False,
+    use_api_data: bool = True,
     facilities: list | None = None,
 ) -> dict:
     """Comprehensive physical risk assessment using analytical models.

@@ -21,9 +21,9 @@ def get_cached_transition(scenario_id: str, pricing_regime: str = "global") -> d
 
 
 @st.cache_data(ttl=600)
-def get_cached_physical(scenario_id: str = "current_policies", year: int = 2030) -> dict:
+def get_cached_physical(scenario_id: str = "current_policies", year: int = 2030, use_api_data: bool = True) -> dict:
     """Cached physical risk assessment (all facilities)."""
-    return assess_physical_risk(scenario_id=scenario_id, year=year)
+    return assess_physical_risk(scenario_id=scenario_id, year=year, use_api_data=use_api_data)
 
 
 @st.cache_data(ttl=600)
