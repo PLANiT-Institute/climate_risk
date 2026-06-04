@@ -31,24 +31,40 @@ _cache: Dict[str, dict] = {}
 _cache_ttl: Dict[str, float] = {}
 _CACHE_TTL_SECONDS = 3600.0  # 1 hour
 
+# Cache statistics (reset per process lifetime)
+_cache_stats: Dict[str, int] = {"hits": 0, "misses": 0}
 
-def _cache_key(lat: float, lon: float) -> str:
-    """Round to 2 decimals (~1km grouping) for cache key."""
-    return f"{round(lat, 2)},{round(lon, 2)}"
+
+def _cache_key(lat: float, lon: float, start_date: str, end_date: str, variables: str) -> str:
+    """Build cache key from all request parameters (~1km coordinate grouping).
+
+    Includes date range and variables so that config changes invalidate
+    the cache rather than returning stale data.
+    """
+    return f"{round(lat, 2)},{round(lon, 2)}|{start_date}|{end_date}|{variables}"
 
 
 def _cache_get(key: str) -> Optional[dict]:
     if key in _cache and (time.time() - _cache_ttl.get(key, 0)) < _CACHE_TTL_SECONDS:
+        _cache_stats["hits"] += 1
+        logger.debug("Cache HIT  key=%s  (hits=%d misses=%d)", key, _cache_stats["hits"], _cache_stats["misses"])
         return _cache[key]
-    # Expired — remove
+    # Expired or absent — remove
     _cache.pop(key, None)
     _cache_ttl.pop(key, None)
+    _cache_stats["misses"] += 1
+    logger.debug("Cache MISS key=%s  (hits=%d misses=%d)", key, _cache_stats["hits"], _cache_stats["misses"])
     return None
 
 
 def _cache_set(key: str, value: dict) -> None:
     _cache[key] = value
     _cache_ttl[key] = time.time()
+
+
+def get_cache_stats() -> Dict[str, int]:
+    """Return current cache hit/miss counts for the process lifetime."""
+    return dict(_cache_stats)
 
 
 # ── API Fetch ─────────────────────────────────────────────────────────
@@ -277,10 +293,14 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
         }
         or None if API fails or insufficient data.
     """
-    key = _cache_key(lat, lon)
+    key = _cache_key(lat, lon, _START_DATE, _END_DATE, _DAILY_VARS)
     cached = _cache_get(key)
     if cached is not None:
-        return cached
+        # Return a shallow copy with cache_hit=True so caller can distinguish
+        result_cached = dict(cached)
+        if "_cache_meta" in result_cached:
+            result_cached["_cache_meta"] = {**result_cached["_cache_meta"], "cache_hit": True}
+        return result_cached
 
     weather = fetch_historical_weather(lat, lon)
     if weather is None:
@@ -310,6 +330,10 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
             "heatwave_days": heatwave is not None,
             "drought_days": drought is not None,
             "wind_speed_annual_max_ms": wind is not None,
+        },
+        "_cache_meta": {
+            "cache_hit": False,
+            "cache_key": key,
         },
     }
 
