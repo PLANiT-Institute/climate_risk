@@ -105,8 +105,18 @@ selected = next(f for f in facs if f["facility_name"] == selected_name)
 
 hazards = selected["hazards"]
 
-# Hazard summary bar chart
-haz_names = [h["hazard_type"] for h in hazards]
+# ── API Warnings ──────────────────────────────────────────────────────
+_fac_warnings = selected.get("api_warnings", [])
+if _fac_warnings:
+    for _w in _fac_warnings:
+        st.warning(f"데이터 소스 주의: {_w}", icon="⚠️")
+
+# ── Hazard summary bar chart ──────────────────────────────────────────
+_HAZARD_KO = {
+    "flood": "홍수", "typhoon": "태풍", "heatwave": "폭염",
+    "drought": "가뭄", "sea_level_rise": "해수면 상승",
+}
+haz_names = [_HAZARD_KO.get(h["hazard_type"], h["hazard_type"]) for h in hazards]
 haz_losses = [h["potential_loss"] for h in hazards]
 haz_colors = ["#3b82f6", "#8b5cf6", "#ef4444", "#f59e0b", "#06b6d4"]
 
@@ -123,17 +133,43 @@ fig_haz.update_xaxes(title="재해 유형")
 fig_haz.update_yaxes(title="EAL (USD)")
 st.plotly_chart(fig_haz, use_container_width=True)
 
-# Hazard detail table
+# ── Hazard detail table ───────────────────────────────────────────────
+_SOURCE_LABEL = {
+    "open_meteo_era5": "좌표 기반 (ERA5)",
+    "static_config":   "정적 권역 기반",
+}
+
 df_hazard = pd.DataFrame([{
-    "재해 유형": h["hazard_type"],
+    "재해 유형": _HAZARD_KO.get(h["hazard_type"], h["hazard_type"]),
+    "데이터 소스": _SOURCE_LABEL.get(h.get("data_source", "static_config"), h.get("data_source", "-")),
     "위험등급": h["risk_level"],
     "발생확률": f'{h["probability"]:.3f}',
     "예상손실": format_currency(h["potential_loss"]),
     "재현기간(년)": h["return_period_years"],
     "기후변화 배율": f'{h["climate_change_multiplier"]:.2f}x',
-    "설명": h["description"],
 } for h in hazards])
 st.dataframe(df_hazard, use_container_width=True, hide_index=True)
+
+# ── Developer expander: cache metadata ───────────────────────────────
+with st.expander("개발자 정보 — 데이터 소스 상세", expanded=False):
+    st.caption("각 hazard의 원본 data_source 값과 캐시 히트 여부")
+    dev_rows = []
+    for h in hazards:
+        raw_source = h.get("data_source", "unknown")
+        dev_rows.append({
+            "hazard_type": h["hazard_type"],
+            "data_source (raw)": raw_source,
+        })
+    st.dataframe(pd.DataFrame(dev_rows), use_container_width=True, hide_index=True)
+
+    # Top-level API warnings from the full result
+    all_warnings = full_result.get("api_warnings", [])
+    if all_warnings:
+        st.caption("전체 api_warnings (전 시설 합산):")
+        for w in all_warnings:
+            st.code(w)
+    else:
+        st.caption("api_warnings: 없음 (모든 hazard가 정상 소스 사용)")
 
 st.divider()
 
