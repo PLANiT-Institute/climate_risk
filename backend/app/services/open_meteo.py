@@ -293,6 +293,11 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
 
     # If any critical derivation failed, return None to trigger fallback
     if gumbel is None:
+        logger.warning(
+            "get_api_derived_baselines: Gumbel parameter derivation failed for "
+            "(%s, %s) — returning None, caller should fall back to static config",
+            lat, lon,
+        )
         return None
 
     result = {
@@ -300,6 +305,12 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
         "heatwave_days": heatwave,
         "drought_days": drought,
         "wind_speed_annual_max_ms": wind,
+        "_api_status": {
+            "gumbel_params": gumbel is not None,
+            "heatwave_days": heatwave is not None,
+            "drought_days": drought is not None,
+            "wind_speed_annual_max_ms": wind is not None,
+        },
     }
 
     _cache_set(key, result)
