@@ -285,6 +285,37 @@ FACILITIES = [
         "ebitda": 2_800_000_000,
         "assets_value": 12_000_000_000,
     },
+    # ── Real Estate (고객사 테스트용 — 수치는 가정값, 공시 데이터 아님) ──
+    {
+        "facility_id": "KR-RE-001",
+        "name": "Concordian",
+        "company": "Client RE Fund",
+        "sector": "real_estate",
+        "location": "서울 종로구",
+        "latitude": 37.570280,
+        "longitude": 126.976914,
+        "current_emissions_scope1": 10_000,
+        "current_emissions_scope2": 50_000,
+        "current_emissions_scope3": 100_000,
+        "annual_revenue": 1_000_000_000,
+        "ebitda": 200_000_000,
+        "assets_value": 100_000_000_000,
+    },
+    {
+        "facility_id": "KR-RE-002",
+        "name": "Logisco Siheung",
+        "company": "Client RE Fund",
+        "sector": "real_estate",
+        "location": "경기 시흥시",
+        "latitude": 37.343924,
+        "longitude": 126.730880,
+        "current_emissions_scope1": 10_000,
+        "current_emissions_scope2": 50_000,
+        "current_emissions_scope3": 100_000,
+        "annual_revenue": 1_000_000_000,
+        "ebitda": 200_000_000,
+        "assets_value": 100_000_000_000,
+    },
 ]
 
 
