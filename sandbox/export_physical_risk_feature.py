@@ -1,7 +1,10 @@
 """Export physical risk feature results for Client RE Fund to Excel.
 
-Runs assess_physical_risk in both API (use_api_data=True) and static
-(use_api_data=False) modes, then writes a five-sheet Excel workbook to
+Runs assess_physical_risk with use_api_data=True (mixed mode):
+  - flood / heatwave / drought  → open_meteo_era5 (좌표 기반 ERA5)
+  - typhoon / sea_level_rise    → static_config   (권역 기반, 모델 특성상 항상 정적)
+
+Writes a five-sheet Excel workbook to
 outputs/client_re_fund_physical_risk_feature_results.xlsx.
 
 Usage:
@@ -16,7 +19,7 @@ from pathlib import Path
 # ── Path setup ──────────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-import openpyxl  # noqa: E402  (after path manipulation)
+import openpyxl  # noqa: E402
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -30,6 +33,13 @@ _FILL_MEDIUM = PatternFill("solid", fgColor="FFFF99")   # light yellow
 _FILL_LOW    = PatternFill("solid", fgColor="CCFFCC")   # light green
 
 _FONT_BOLD = Font(bold=True)
+
+# ── Risk level criteria labels ───────────────────────────────────────────────
+_RISK_CRITERIA = {
+    "High":   "EAL/자산 ≥ 0.50%",
+    "Medium": "0.10% ≤ EAL/자산 < 0.50%",
+    "Low":    "EAL/자산 < 0.10%",
+}
 
 
 def _autofit(ws: openpyxl.worksheet.worksheet.Worksheet) -> None:
@@ -59,17 +69,16 @@ print("Client RE Fund 시설 데이터 로딩 중...")
 facs = get_facilities_by_company("Client RE Fund")
 print(f"  → {len(facs)}개 시설 확인")
 
-print("API 모드 평가 실행 중 (use_api_data=True)...")
-r_api = assess_physical_risk(
+# Single mixed-mode run:
+#   flood/heatwave/drought → API (ERA5), typhoon/sea_level_rise → static (모델 특성)
+print("혼합 모드 평가 실행 중 (use_api_data=True)...")
+result = assess_physical_risk(
     "current_policies", 2030, use_api_data=True, facilities=facs
 )
 print("  → 완료")
 
-print("정적 모드 평가 실행 중 (use_api_data=False)...")
-r_static = assess_physical_risk(
-    "current_policies", 2030, use_api_data=False, facilities=facs
-)
-print("  → 완료")
+# assets_value lookup for EAL ratio calculation
+_assets_lookup: dict[str, float] = {f["facility_id"]: f["assets_value"] for f in facs}
 
 branch = subprocess.check_output(
     ["git", "branch", "--show-current"],
@@ -80,31 +89,19 @@ run_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ── Derived aggregates ────────────────────────────────────────────────────────
-def _sum_potential_loss(result: dict) -> float:
-    total = 0.0
-    for fac_r in result["facilities"]:
-        for h in fac_r["hazards"]:
-            total += h.get("potential_loss", 0)
-    return total
+def _sum_potential_loss(r: dict) -> float:
+    return sum(
+        h.get("potential_loss", 0)
+        for fac_r in r["facilities"]
+        for h in fac_r["hazards"]
+    )
 
 
-def _sum_eal(result: dict) -> float:
-    return sum(f["total_expected_annual_loss"] for f in result["facilities"])
-
-
-total_pl_api    = _sum_potential_loss(r_api)
-total_pl_static = _sum_potential_loss(r_static)
-total_eal_api   = _sum_eal(r_api)
-total_eal_static = _sum_eal(r_static)
-
-eal_change_pct = (
-    round((total_eal_api - total_eal_static) / total_eal_static * 100, 1)
-    if total_eal_static != 0
-    else "N/A"
-)
+total_pl   = _sum_potential_loss(result)
+total_eal  = sum(f["total_expected_annual_loss"] for f in result["facilities"])
 
 api_warnings_str = "; ".join(
-    sorted({w for f in r_api["facilities"] for w in f.get("api_warnings", [])})
+    sorted({w for f in result["facilities"] for w in f.get("api_warnings", [])})
 ) or "없음"
 
 
@@ -117,47 +114,41 @@ ws1 = wb.active
 ws1.title = "Summary"
 
 summary_rows: list[tuple[str, object]] = [
-    ("회사명",                   "Client RE Fund"),
-    ("실행 시각",                run_time),
-    ("브랜치명",                  branch),
-    ("시나리오",                  "current_policies"),
-    ("평가 연도",                 2030),
-    ("use_api_data",             "True"),
-    ("총 potential_loss (API)",  total_pl_api),
-    ("총 potential_loss (Static)", total_pl_static),
-    ("총 EAL (API)",             total_eal_api),
-    ("총 EAL (Static)",          total_eal_static),
-    ("EAL 변화 (%)",             eal_change_pct),
-    ("api_warnings",             api_warnings_str),
+    ("회사명",          "Client RE Fund"),
+    ("실행 시각",       run_time),
+    ("브랜치명",        branch),
+    ("시나리오",        "current_policies"),
+    ("평가 연도",       2030),
+    ("데이터 모드",     "혼합 (홍수·폭염·가뭄: ERA5 API, 태풍·해수면: 정적 권역)"),
+    ("총 potential_loss", total_pl),
+    ("총 EAL",          total_eal),
+    ("api_warnings",    api_warnings_str),
     (
-        "주요 변경 요약",
-        "홍수·폭염·가뭄은 ERA5 좌표 기반으로 전환. 태풍·해수면 상승은 정적 권역 기반 유지.",
+        "위험등급 분류 기준",
+        "High: EAL/자산 ≥ 0.50%  |  Medium: 0.10% ≤ EAL/자산 < 0.50%  |  Low: EAL/자산 < 0.10%",
+    ),
+    (
+        "주요 사항",
+        "홍수·폭염·가뭄은 ERA5 좌표 기반으로 계산. 태풍·해수면 상승은 정적 권역 기반 유지.",
     ),
 ]
 
-_numeric_labels = {
-    "총 potential_loss (API)",
-    "총 potential_loss (Static)",
-    "총 EAL (API)",
-    "총 EAL (Static)",
-    "EAL 변화 (%)",
-}
-
-# Header row
 ws1.cell(row=1, column=1, value="항목").font = _FONT_BOLD
 ws1.cell(row=1, column=1).fill = _FILL_HEADER
 ws1.cell(row=1, column=2, value="값").font = _FONT_BOLD
 ws1.cell(row=1, column=2).fill = _FILL_HEADER
+
+_numeric_labels = {"총 potential_loss", "총 EAL"}
 
 for row_idx, (label, value) in enumerate(summary_rows, start=2):
     label_cell = ws1.cell(row=row_idx, column=1, value=label)
     label_cell.font = _FONT_BOLD
     val_cell = ws1.cell(row=row_idx, column=2, value=value)
     if label in _numeric_labels and isinstance(value, (int, float)):
-        val_cell.number_format = "#,##0.0" if label == "EAL 변화 (%)" else "#,##0"
+        val_cell.number_format = "#,##0"
 
 ws1.column_dimensions["A"].width = 30
-ws1.column_dimensions["B"].width = 80
+ws1.column_dimensions["B"].width = 90
 
 
 # ── Sheet 2: Input_Facilities ─────────────────────────────────────────────────
@@ -203,78 +194,52 @@ _autofit(ws2)
 ws3 = wb.create_sheet("Hazard_Results")
 
 hazard_cols = [
-    "facility_id", "facility_name", "hazard_type", "mode",
-    "risk_level", "probability", "potential_loss",
+    "facility_id", "facility_name", "hazard_type", "data_source",
+    "risk_level", "risk_level_criteria", "eal_as_pct_of_assets",
+    "probability", "potential_loss",
     "return_period_years", "climate_change_multiplier",
-    "data_source", "has_api_warning", "cache_hit", "diff_pct",
 ]
 
 _header_row(ws3, 1, hazard_cols)
 
-# Build lookup: facility_id × hazard_type → static potential_loss
-_static_loss_lookup: dict[tuple[str, str], float] = {}
-for fac_r in r_static["facilities"]:
-    for h in fac_r["hazards"]:
-        _static_loss_lookup[(fac_r["facility_id"], h["hazard_type"])] = h.get(
-            "potential_loss", 0
-        )
-
-# Build rows for both modes, then sort
 hazard_rows: list[dict] = []
 
-for mode_label, result in [("API", r_api), ("Static", r_static)]:
-    for fac_r in result["facilities"]:
-        fac_id   = fac_r["facility_id"]
-        fac_name = fac_r["facility_name"]
-        api_warn_hazards: set[str] = set()
-        for w in fac_r.get("api_warnings", []):
-            # Warning format: "hazard_type: API unavailable, ..."
-            api_warn_hazards.add(w.split(":")[0].strip())
+for fac_r in result["facilities"]:
+    fac_id   = fac_r["facility_id"]
+    fac_name = fac_r["facility_name"]
+    assets   = _assets_lookup.get(fac_id, 1)
 
-        for h in fac_r["hazards"]:
-            hazard_type = h["hazard_type"]
-            potential_loss = h.get("potential_loss", 0)
+    for h in fac_r["hazards"]:
+        potential_loss = h.get("potential_loss", 0)
+        eal_ratio_pct  = round(potential_loss / assets * 100, 4) if assets else 0
+        risk_level     = h.get("risk_level", "")
 
-            # diff_pct only for API rows
-            if mode_label == "API":
-                static_loss = _static_loss_lookup.get((fac_id, hazard_type), 0)
-                if static_loss > 0:
-                    diff_pct: object = round(
-                        (potential_loss - static_loss) / static_loss * 100, 1
-                    )
-                else:
-                    diff_pct = "N/A"
-            else:
-                diff_pct = ""
+        hazard_rows.append({
+            "facility_id":               fac_id,
+            "facility_name":             fac_name,
+            "hazard_type":               h["hazard_type"],
+            "data_source":               h.get("data_source", ""),
+            "risk_level":                risk_level,
+            "risk_level_criteria":       _RISK_CRITERIA.get(risk_level, ""),
+            "eal_as_pct_of_assets":      eal_ratio_pct,
+            "probability":               h.get("probability", ""),
+            "potential_loss":            potential_loss,
+            "return_period_years":       h.get("return_period_years", ""),
+            "climate_change_multiplier": h.get("climate_change_multiplier", ""),
+        })
 
-            hazard_rows.append({
-                "facility_id":              fac_id,
-                "facility_name":            fac_name,
-                "hazard_type":              hazard_type,
-                "mode":                     mode_label,
-                "risk_level":               h.get("risk_level", ""),
-                "probability":              h.get("probability", ""),
-                "potential_loss":           potential_loss,
-                "return_period_years":      h.get("return_period_years", ""),
-                "climate_change_multiplier": h.get("climate_change_multiplier", ""),
-                "data_source":              h.get("data_source", ""),
-                "has_api_warning":          hazard_type in api_warn_hazards,
-                "cache_hit":                "N/A",
-                "diff_pct":                 diff_pct,
-            })
+hazard_rows.sort(key=lambda r: (r["facility_name"], r["hazard_type"]))
 
-# Sort: facility_name, hazard_type, mode
-hazard_rows.sort(key=lambda r: (r["facility_name"], r["hazard_type"], r["mode"]))
-
-_risk_fill = {"High": _FILL_HIGH, "Medium": _FILL_MEDIUM, "Low": _FILL_LOW}
+_risk_fill    = {"High": _FILL_HIGH, "Medium": _FILL_MEDIUM, "Low": _FILL_LOW}
 _risk_col_idx = hazard_cols.index("risk_level") + 1
-_loss_col_idx = hazard_cols.index("potential_loss") + 1
 
 for row_idx, row in enumerate(hazard_rows, start=2):
     for col_idx, col_name in enumerate(hazard_cols, start=1):
         cell = ws3.cell(row=row_idx, column=col_idx, value=row[col_name])
         if col_name == "potential_loss" and isinstance(row[col_name], (int, float)):
             cell.number_format = "#,##0"
+        if col_name == "eal_as_pct_of_assets" and isinstance(row[col_name], (int, float)):
+            cell.number_format = '0.0000"%"'
         if col_name == "risk_level" and row[col_name] in _risk_fill:
             cell.fill = _risk_fill[row[col_name]]
 
@@ -284,7 +249,6 @@ _autofit(ws3)
 # ── Sheet 4: Data_Source_Explanation ─────────────────────────────────────────
 ws4 = wb.create_sheet("Data_Source_Explanation")
 
-# Section 1
 ws4.cell(row=1, column=1, value="데이터 소스별 hazard").font = _FONT_BOLD
 _header_row(ws4, 2, ["hazard_type", "data_source", "설명", "한계"])
 
@@ -326,7 +290,6 @@ for row_idx, vals in enumerate(section1_rows, start=3):
         cell = ws4.cell(row=row_idx, column=col_idx, value=val)
         cell.alignment = Alignment(wrap_text=True)
 
-# Section 2
 section2_start = 3 + len(section1_rows) + 2
 ws4.cell(row=section2_start, column=1, value="API 실패 시 동작").font = _FONT_BOLD
 _header_row(ws4, section2_start + 1, ["상황", "동작"])
@@ -337,8 +300,7 @@ ws4.cell(
     value=(
         "Open-Meteo API 호출이 HTTP 429(속도 제한) 또는 기타 오류를 반환하면, "
         "모델은 오류를 발생시키지 않고 해당 hazard에 대해 static_config로 자동 폴백합니다. "
-        "폴백 발생 시 해당 hazard 이름이 시설별 api_warnings 목록에 기록되고, "
-        "최상위 결과의 api_warnings에도 집계됩니다. "
+        "폴백 발생 시 Summary 시트의 api_warnings에 기록됩니다. "
         "data_source 필드가 'open_meteo_era5' 대신 'static_config'로 표시됩니다."
     ),
 )
@@ -358,10 +320,22 @@ _header_row(ws5, 1, method_cols)
 
 method_rows = [
     (
+        "위험등급 분류 기준",
+        "High: EAL/자산 ≥ 0.50%  |  Medium: 0.10% ≤ EAL/자산 < 0.50%  |  Low: EAL/자산 < 0.10%",
+        "-",
+        "자산가치 대비 연간 기대손실 비율로 분류. hazard별 개별 적용.",
+    ),
+    (
         "potential_loss",
         "각 재현기간별 예상손실을 발생확률로 가중합산한 연간 기대손실 (EAL). 영업중단 비용 포함",
         "USD",
         "단일 이벤트 손실이 아닌 연간 평균값",
+    ),
+    (
+        "eal_as_pct_of_assets",
+        "potential_loss ÷ 자산가치 × 100. 위험등급 분류에 직접 사용되는 비율",
+        "%",
+        "annual_revenue=0인 자산은 영업중단 손실이 0으로 계산됨. 자산 기반 직접 손상만 반영.",
     ),
     (
         "probability",
@@ -389,15 +363,6 @@ method_rows = [
         "해당 hazard 계산에 사용된 데이터 출처",
         "-",
         "open_meteo_era5: 좌표 기반 실측. static_config: 권역 평균 추정치",
-    ),
-    (
-        "static_config vs open_meteo_era5",
-        (
-            "static_config는 한국을 6개 권역으로 분류한 평균값 사용. "
-            "open_meteo_era5는 자산 좌표의 ERA5 30년 데이터로 직접 계산"
-        ),
-        "-",
-        "동일 권역 내 자산은 static_config에서 동일한 기준값을 가짐",
     ),
     (
         "GRESB 주의사항",
