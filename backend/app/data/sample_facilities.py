@@ -17,8 +17,8 @@ FACILITIES = [
         "current_emissions_scope1": 10_000,
         "current_emissions_scope2": 50_000,
         "current_emissions_scope3": 100_000,
-        "annual_revenue": 1_000_000_000,
-        "ebitda": 200_000_000,
+        "annual_revenue": 0,
+        "ebitda": 0,
         "assets_value": 100_000_000_000,
     },
     {
@@ -32,8 +32,8 @@ FACILITIES = [
         "current_emissions_scope1": 10_000,
         "current_emissions_scope2": 50_000,
         "current_emissions_scope3": 100_000,
-        "annual_revenue": 1_000_000_000,
-        "ebitda": 200_000_000,
+        "annual_revenue": 0,
+        "ebitda": 0,
         "assets_value": 100_000_000_000,
     },
 ]

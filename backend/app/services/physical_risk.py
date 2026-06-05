@@ -23,8 +23,11 @@ References:
 - Munich Re NatCatSERVICE (2023), business interruption data
 """
 
+import logging
 import math
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from ..core.config import (
     FLOOD_GUMBEL_PARAMS,
@@ -52,7 +55,7 @@ from .climate_science import (
     get_hazard_intensity_multiplier,
     get_sea_level_rise_mm,
 )
-from .open_meteo import get_api_derived_baselines
+from .open_meteo import get_api_derived_baselines, is_rate_limited
 
 HAZARD_TYPES = ["flood", "typhoon", "heatwave", "drought", "sea_level_rise"]
 
@@ -218,8 +221,14 @@ def _flood_risk_model(
 
     probability = 1.0 / (_RETURN_PERIODS[0] / freq_mult)  # Annual prob of most frequent event
 
+    _flood_data_source = (
+        "open_meteo_era5"
+        if api_baselines is not None and api_baselines.get("gumbel_params") is not None
+        else "static_config"
+    )
     return {
         "hazard_type": "flood",
+        "data_source": _flood_data_source,
         "risk_level": _risk_level(eal / assets if assets else 0),
         "probability": round(min(1.0, probability), 3),
         "potential_loss": round(eal),
@@ -306,6 +315,7 @@ def _typhoon_risk_model(
 
     return {
         "hazard_type": "typhoon",
+        "data_source": "static_config",
         "risk_level": _risk_level(total_eal / assets if assets else 0),
         "probability": round(min(1.0, adjusted_freq), 3),
         "potential_loss": round(total_eal),
@@ -371,8 +381,14 @@ def _heatwave_risk_model(
     total_eal = productivity_loss + equipment_loss
     assets = fac["assets_value"]
 
+    _heatwave_data_source = (
+        "open_meteo_era5"
+        if api_baselines is not None and api_baselines.get("heatwave_days") is not None
+        else "static_config"
+    )
     return {
         "hazard_type": "heatwave",
+        "data_source": _heatwave_data_source,
         "risk_level": _risk_level(total_eal / assets if assets else 0),
         "probability": round(min(1.0, hw_days / 365), 3),
         "potential_loss": round(total_eal),
@@ -430,8 +446,14 @@ def _drought_risk_model(
     total_eal = revenue_at_risk + bi_cost
     assets = fac["assets_value"]
 
+    _drought_data_source = (
+        "open_meteo_era5"
+        if api_baselines is not None and api_baselines.get("drought_days") is not None
+        else "static_config"
+    )
     return {
         "hazard_type": "drought",
+        "data_source": _drought_data_source,
         "risk_level": _risk_level(total_eal / assets if assets else 0),
         "probability": round(min(1.0, drought_days / 365 * freq_mult), 3),
         "potential_loss": round(total_eal),
@@ -463,6 +485,7 @@ def _sea_level_rise_model(
     if not is_coastal:
         return {
             "hazard_type": "sea_level_rise",
+            "data_source": "static_config",
             "risk_level": "Low",
             "probability": round(slr_mm / 10000, 3),  # Very low inland
             "potential_loss": 0,
@@ -484,6 +507,7 @@ def _sea_level_rise_model(
 
     return {
         "hazard_type": "sea_level_rise",
+        "data_source": "static_config",
         "risk_level": _risk_level(annual_loss / assets if assets else 0),
         "probability": round(min(1.0, slr_cm / 100), 3),
         "potential_loss": round(annual_loss),
@@ -536,7 +560,7 @@ def _compound_risk_adjusted_eal(hazard_eals: Dict[str, float]) -> float:
 def assess_physical_risk(
     scenario_id: str = "current_policies",
     year: int = 2030,
-    use_api_data: bool = False,
+    use_api_data: bool = True,
     facilities: list | None = None,
 ) -> dict:
     """Comprehensive physical risk assessment using analytical models.
@@ -582,6 +606,30 @@ def assess_physical_risk(
         overall = _risk_level(total_eal / assets if assets else 0)
         risk_counts[overall] = risk_counts.get(overall, 0) + 1
 
+        # Build per-facility api_warnings when use_api_data=True but a hazard
+        # fell back to static_config despite the API being requested.
+        api_warnings: List[str] = []
+        if use_api_data:
+            rate_limited_now = is_rate_limited()
+            for h in hazards:
+                if h.get("data_source") == "static_config":
+                    if rate_limited_now:
+                        msg = (
+                            f"{h['hazard_type']}: Open-Meteo 요청 제한(429) — "
+                            "일시적으로 정적 권역 기반 값 사용"
+                        )
+                    else:
+                        msg = (
+                            f"{h['hazard_type']}: API 오류 — "
+                            "일시적으로 정적 권역 기반 값 사용"
+                        )
+                    api_warnings.append(msg)
+                    logger.warning(
+                        "assess_physical_risk: facility %s — %s",
+                        fac.get("facility_id", "unknown"),
+                        msg,
+                    )
+
         results.append({
             "facility_id": fac["facility_id"],
             "facility_name": fac["name"],
@@ -591,7 +639,15 @@ def assess_physical_risk(
             "overall_risk_level": overall,
             "hazards": hazards,
             "total_expected_annual_loss": round(total_eal),
+            "api_warnings": api_warnings,
         })
+
+    # Aggregate unique api_warnings across all facilities
+    all_api_warnings: List[str] = list({
+        w
+        for r in results
+        for w in r.get("api_warnings", [])
+    })
 
     return {
         "total_facilities": len(results),
@@ -602,6 +658,7 @@ def assess_physical_risk(
         "assessment_year": year,
         "warming_above_preindustrial": round(warming, 2),
         "data_source": "open_meteo_api" if use_api_data else "hardcoded_config",
+        "api_warnings": all_api_warnings,
         "methodology_notes": {
             "uncertainty": (
                 "All outputs are point estimates. No confidence intervals "

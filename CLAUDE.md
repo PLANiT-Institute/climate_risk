@@ -48,6 +48,7 @@ Pytest. New features need tests. Aim for **meaningful** coverage of math correct
 - **Conventional commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`.
 - **Self-review before merge**: re-read the diff. For math changes, paste before/after equations into the PR description. CI passing ≠ math correct.
 - Never `--force` push to main. Use `git revert` to undo merged commits.
+- **main 머지 권한은 Joowon에게만 있다.** Claude는 main으로 머지하거나 머지를 제안하지 않는다. feature 브랜치 작업 완료 후 "머지할까요?" 라고 묻지 말 것.
 
 ## Project layout
 

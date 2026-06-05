@@ -5,11 +5,16 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
+
 from utils.helpers import (
     RISK_COLORS, SCENARIO_NAMES, COMPANY_NAMES_KR,
     format_currency, default_layout,
 )
 from utils.company_data import get_cached_physical, filter_physical_by_company
+from app.services.open_meteo import rate_limit_cooldown_remaining
 
 st.set_page_config(page_title="물리적 리스크", page_icon="🌊", layout="wide")
 
@@ -48,6 +53,56 @@ with col3:
     st.metric("중위험", f'{risk_summary.get("Medium", 0)}개')
 with col4:
     st.metric("온난화", f'+{result["warming_above_preindustrial"]:.1f}°C')
+
+st.info(
+    "**데이터 소스 안내** | "
+    "홍수·폭염·가뭄: 자산 좌표 기반 ERA5 기후 데이터 (Open-Meteo) 사용 — "
+    "태풍·해수면 상승: 정적 권역 기반 모델 사용 (API 경로 미구현). "
+    "두 유형은 데이터 출처가 다르므로 결과 비교 시 유의하세요.",
+    icon="ℹ️",
+)
+
+# ── API Fallback Summary (rate-limit or API error) ────────────────────
+_all_fac_warnings = [
+    (f["facility_name"], w)
+    for f in facs
+    for w in f.get("api_warnings", [])
+]
+_rate_limit_hits = [
+    (name, w) for name, w in _all_fac_warnings if "429" in w or "요청 제한" in w
+]
+_api_error_hits = [
+    (name, w) for name, w in _all_fac_warnings
+    if w not in [w2 for _, w2 in _rate_limit_hits]
+]
+
+if _rate_limit_hits:
+    _cooldown_secs = rate_limit_cooldown_remaining()
+    if _cooldown_secs > 0:
+        _cooldown_msg = f" 약 {int(_cooldown_secs)}초 후 자동 재시도됩니다."
+    else:
+        _cooldown_msg = " 쿨다운이 만료되었습니다 — 다음 조회 시 자동 재시도됩니다."
+    st.warning(
+        f"**Open-Meteo 요청 제한(429)** — "
+        f"{len({n for n, _ in _rate_limit_hits})}개 시설의 일부 hazard가 "
+        f"일시적으로 정적 권역 기반 값으로 대체되었습니다.{_cooldown_msg} "
+        "아래 표에서 영향받은 시설과 hazard를 확인하세요.",
+        icon="⚠️",
+    )
+    _df_rl = pd.DataFrame(_rate_limit_hits, columns=["시설명", "내용"])
+    _df_rl_agg = (
+        _df_rl.groupby("시설명")["내용"]
+        .apply(lambda xs: ", ".join(x.split(":")[0] for x in xs))
+        .reset_index()
+        .rename(columns={"내용": "영향 hazard"})
+    )
+    st.dataframe(_df_rl_agg, use_container_width=True, hide_index=True)
+elif _api_error_hits:
+    st.warning(
+        f"**API 오류** — {len({n for n, _ in _api_error_hits})}개 시설의 일부 hazard가 "
+        "일시적으로 정적 권역 기반 값으로 대체되었습니다.",
+        icon="⚠️",
+    )
 
 st.divider()
 
@@ -106,10 +161,30 @@ fac_names = [f["facility_name"] for f in facs]
 selected_name = st.selectbox("시설 선택", fac_names)
 selected = next(f for f in facs if f["facility_name"] == selected_name)
 
-hazards = selected["hazards"]
+# Strip any internal bookkeeping keys that the API layer may attach to hazard
+# dicts (e.g. _cache_meta, _api_status from open_meteo.get_api_derived_baselines).
+# These should not be present in hazard dicts per the current backend, but this
+# guard ensures backward and forward compatibility if the schema ever drifts.
+_INTERNAL_KEYS = {"_cache_meta", "_api_status"}
 
-# Hazard summary bar chart
-haz_names = [h["hazard_type"] for h in hazards]
+def _clean_hazard(h: dict) -> dict:
+    """Return a copy of hazard dict with internal underscore keys removed."""
+    return {k: v for k, v in h.items() if k not in _INTERNAL_KEYS}
+
+hazards = [_clean_hazard(h) for h in selected["hazards"]]
+
+# ── API Warnings ──────────────────────────────────────────────────────
+_fac_warnings = selected.get("api_warnings", [])
+if _fac_warnings:
+    for _w in _fac_warnings:
+        st.warning(f"데이터 소스 주의: {_w}", icon="⚠️")
+
+# ── Hazard summary bar chart ──────────────────────────────────────────
+_HAZARD_KO = {
+    "flood": "홍수", "typhoon": "태풍", "heatwave": "폭염",
+    "drought": "가뭄", "sea_level_rise": "해수면 상승",
+}
+haz_names = [_HAZARD_KO.get(h["hazard_type"], h["hazard_type"]) for h in hazards]
 haz_losses = [h["potential_loss"] for h in hazards]
 haz_colors = ["#3b82f6", "#8b5cf6", "#ef4444", "#f59e0b", "#06b6d4"]
 
@@ -126,17 +201,43 @@ fig_haz.update_xaxes(title="재해 유형")
 fig_haz.update_yaxes(title="EAL (USD)")
 st.plotly_chart(fig_haz, use_container_width=True)
 
-# Hazard detail table
+# ── Hazard detail table ───────────────────────────────────────────────
+_SOURCE_LABEL = {
+    "open_meteo_era5": "좌표 기반 (ERA5)",
+    "static_config":   "정적 권역 기반",
+}
+
 df_hazard = pd.DataFrame([{
-    "재해 유형": h["hazard_type"],
+    "재해 유형": _HAZARD_KO.get(h["hazard_type"], h["hazard_type"]),
+    "데이터 소스": _SOURCE_LABEL.get(h.get("data_source", "static_config"), h.get("data_source", "-")),
     "위험등급": h["risk_level"],
     "발생확률": f'{h["probability"]:.3f}',
     "예상손실": format_currency(h["potential_loss"]),
     "재현기간(년)": h["return_period_years"],
     "기후변화 배율": f'{h["climate_change_multiplier"]:.2f}x',
-    "설명": h["description"],
 } for h in hazards])
 st.dataframe(df_hazard, use_container_width=True, hide_index=True)
+
+# ── Developer expander: cache metadata ───────────────────────────────
+with st.expander("개발자 정보 — 데이터 소스 상세", expanded=False):
+    st.caption("각 hazard의 원본 data_source 값과 캐시 히트 여부")
+    dev_rows = []
+    for h in hazards:
+        raw_source = h.get("data_source", "unknown")
+        dev_rows.append({
+            "hazard_type": h["hazard_type"],
+            "data_source (raw)": raw_source,
+        })
+    st.dataframe(pd.DataFrame(dev_rows), use_container_width=True, hide_index=True)
+
+    # Top-level API warnings from the full result
+    all_warnings = full_result.get("api_warnings", [])
+    if all_warnings:
+        st.caption("전체 api_warnings (전 시설 합산):")
+        for w in all_warnings:
+            st.code(w)
+    else:
+        st.caption("api_warnings: 없음 (모든 hazard가 정상 소스 사용)")
 
 st.divider()
 
@@ -152,6 +253,7 @@ hazard_labels = {
 agg = {ht: 0 for ht in hazard_types}
 for f in facs:
     for h in f["hazards"]:
+        h = _clean_hazard(h)
         if h["hazard_type"] in agg:
             agg[h["hazard_type"]] += h["potential_loss"]
 

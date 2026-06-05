@@ -26,29 +26,83 @@ _TIMEOUT = 30.0  # seconds
 _MIN_YEARS = 5  # minimum years of data required
 _HEATWAVE_THRESHOLD_C = 33.0  # KMA heatwave definition
 
+# Inter-request delay to avoid 429 rate limits (seconds)
+_INTER_REQUEST_DELAY = 1.0
+
 # ── In-Memory Cache (1-hour TTL, ~1km grouping) ──────────────────────
 _cache: Dict[str, dict] = {}
 _cache_ttl: Dict[str, float] = {}
 _CACHE_TTL_SECONDS = 3600.0  # 1 hour
 
+# Cache statistics (reset per process lifetime)
+_cache_stats: Dict[str, int] = {"hits": 0, "misses": 0}
 
-def _cache_key(lat: float, lon: float) -> str:
-    """Round to 2 decimals (~1km grouping) for cache key."""
-    return f"{round(lat, 2)},{round(lon, 2)}"
+# ── Rate-limit state (module-level, process lifetime) ─────────────────
+# Once a 429 is received, new API calls are blocked for _RATE_LIMIT_COOLDOWN_SECONDS.
+# After the cooldown, one probe request is allowed. If it succeeds, the flag clears.
+# If it hits 429 again, the cooldown resets.
+# Cache hits are always served normally — only new HTTP requests are gated.
+_RATE_LIMIT_COOLDOWN_SECONDS = 300.0  # 5 minutes
+
+_rate_limited: bool = False
+_rate_limited_at: Optional[float] = None  # timestamp of most recent 429
+
+
+def is_rate_limited() -> bool:
+    """Return True if currently within the rate-limit cooldown window."""
+    if not _rate_limited:
+        return False
+    if _rate_limited_at is None:
+        return True
+    elapsed = time.time() - _rate_limited_at
+    return elapsed < _RATE_LIMIT_COOLDOWN_SECONDS
+
+
+def reset_rate_limit() -> None:
+    """Clear the rate-limit flag (use for testing or manual recovery)."""
+    global _rate_limited, _rate_limited_at
+    _rate_limited = False
+    _rate_limited_at = None
+
+
+def rate_limit_cooldown_remaining() -> float:
+    """Seconds remaining in the current cooldown window, or 0.0 if not limited."""
+    if not _rate_limited or _rate_limited_at is None:
+        return 0.0
+    remaining = _RATE_LIMIT_COOLDOWN_SECONDS - (time.time() - _rate_limited_at)
+    return max(0.0, remaining)
+
+
+def _cache_key(lat: float, lon: float, start_date: str, end_date: str, variables: str) -> str:
+    """Build cache key from all request parameters (~1km coordinate grouping).
+
+    Includes date range and variables so that config changes invalidate
+    the cache rather than returning stale data.
+    """
+    return f"{round(lat, 2)},{round(lon, 2)}|{start_date}|{end_date}|{variables}"
 
 
 def _cache_get(key: str) -> Optional[dict]:
     if key in _cache and (time.time() - _cache_ttl.get(key, 0)) < _CACHE_TTL_SECONDS:
+        _cache_stats["hits"] += 1
+        logger.debug("Cache HIT  key=%s  (hits=%d misses=%d)", key, _cache_stats["hits"], _cache_stats["misses"])
         return _cache[key]
-    # Expired — remove
+    # Expired or absent — remove
     _cache.pop(key, None)
     _cache_ttl.pop(key, None)
+    _cache_stats["misses"] += 1
+    logger.debug("Cache MISS key=%s  (hits=%d misses=%d)", key, _cache_stats["hits"], _cache_stats["misses"])
     return None
 
 
 def _cache_set(key: str, value: dict) -> None:
     _cache[key] = value
     _cache_ttl[key] = time.time()
+
+
+def get_cache_stats() -> Dict[str, int]:
+    """Return current cache hit/miss counts for the process lifetime."""
+    return dict(_cache_stats)
 
 
 # ── API Fetch ─────────────────────────────────────────────────────────
@@ -60,8 +114,10 @@ def fetch_historical_weather(
     Returns:
         {"temperature_2m_max": [...], "precipitation_sum": [...],
          "wind_speed_10m_max": [...], "time": [...]}
-        or None on failure.
+        or None on failure. Sets module-level _rate_limited=True on HTTP 429.
     """
+    global _rate_limited, _rate_limited_at
+
     params = {
         "latitude": round(lat, 2),
         "longitude": round(lon, 2),
@@ -74,6 +130,15 @@ def fetch_historical_weather(
     try:
         with httpx.Client(timeout=_TIMEOUT) as client:
             resp = client.get(_API_BASE, params=params)
+            if resp.status_code == 429:
+                _rate_limited = True
+                _rate_limited_at = time.time()
+                logger.warning(
+                    "Open-Meteo 429 rate limit hit for (%s, %s) — "
+                    "all further API calls will use static_config this session",
+                    lat, lon,
+                )
+                return None
             resp.raise_for_status()
             data = resp.json()
 
@@ -89,7 +154,17 @@ def fetch_historical_weather(
             "time": daily.get("time", []),
         }
 
-    except (httpx.HTTPError, httpx.TimeoutException, Exception) as e:
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            _rate_limited = True
+            _rate_limited_at = time.time()
+            logger.warning(
+                "Open-Meteo 429 rate limit hit for (%s, %s): %s", lat, lon, e
+            )
+        else:
+            logger.warning("Open-Meteo API error for (%s, %s): %s", lat, lon, e)
+        return None
+    except (httpx.TimeoutException, Exception) as e:
         logger.warning("Open-Meteo API error for (%s, %s): %s", lat, lon, e)
         return None
 
@@ -277,10 +352,29 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
         }
         or None if API fails or insufficient data.
     """
-    key = _cache_key(lat, lon)
+    key = _cache_key(lat, lon, _START_DATE, _END_DATE, _DAILY_VARS)
     cached = _cache_get(key)
     if cached is not None:
-        return cached
+        # Return a shallow copy with cache_hit=True so caller can distinguish
+        result_cached = dict(cached)
+        if "_cache_meta" in result_cached:
+            result_cached["_cache_meta"] = {**result_cached["_cache_meta"], "cache_hit": True}
+        return result_cached
+
+    # Skip HTTP call while within the rate-limit cooldown window.
+    # Once the cooldown expires, is_rate_limited() returns False and
+    # one probe request is allowed. If it hits 429 again, _rate_limited_at
+    # is refreshed and the cooldown resets.
+    if is_rate_limited():
+        logger.debug(
+            "get_api_derived_baselines: skipping API call for (%s, %s) — "
+            "rate limit cooldown (%.0fs remaining)",
+            lat, lon, rate_limit_cooldown_remaining(),
+        )
+        return None
+
+    # Throttle requests to avoid triggering rate limits
+    time.sleep(_INTER_REQUEST_DELAY)
 
     weather = fetch_historical_weather(lat, lon)
     if weather is None:
@@ -293,6 +387,11 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
 
     # If any critical derivation failed, return None to trigger fallback
     if gumbel is None:
+        logger.warning(
+            "get_api_derived_baselines: Gumbel parameter derivation failed for "
+            "(%s, %s) — returning None, caller should fall back to static config",
+            lat, lon,
+        )
         return None
 
     result = {
@@ -300,6 +399,16 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
         "heatwave_days": heatwave,
         "drought_days": drought,
         "wind_speed_annual_max_ms": wind,
+        "_api_status": {
+            "gumbel_params": gumbel is not None,
+            "heatwave_days": heatwave is not None,
+            "drought_days": drought is not None,
+            "wind_speed_annual_max_ms": wind is not None,
+        },
+        "_cache_meta": {
+            "cache_hit": False,
+            "cache_key": key,
+        },
     }
 
     _cache_set(key, result)
