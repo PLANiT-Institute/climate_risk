@@ -38,15 +38,24 @@ _CACHE_TTL_SECONDS = 3600.0  # 1 hour
 _cache_stats: Dict[str, int] = {"hits": 0, "misses": 0}
 
 # ── Rate-limit state (module-level, process lifetime) ─────────────────
-# Once a 429 is received, skip all further API calls in this session.
-# Cache hits are still served normally — only new HTTP requests are blocked.
+# Once a 429 is received, new API calls are blocked for _RATE_LIMIT_COOLDOWN_SECONDS.
+# After the cooldown, one probe request is allowed. If it succeeds, the flag clears.
+# If it hits 429 again, the cooldown resets.
+# Cache hits are always served normally — only new HTTP requests are gated.
+_RATE_LIMIT_COOLDOWN_SECONDS = 300.0  # 5 minutes
+
 _rate_limited: bool = False
-_rate_limited_at: Optional[float] = None  # timestamp of first 429
+_rate_limited_at: Optional[float] = None  # timestamp of most recent 429
 
 
 def is_rate_limited() -> bool:
-    """Return True if a 429 was received during this process lifetime."""
-    return _rate_limited
+    """Return True if currently within the rate-limit cooldown window."""
+    if not _rate_limited:
+        return False
+    if _rate_limited_at is None:
+        return True
+    elapsed = time.time() - _rate_limited_at
+    return elapsed < _RATE_LIMIT_COOLDOWN_SECONDS
 
 
 def reset_rate_limit() -> None:
@@ -54,6 +63,14 @@ def reset_rate_limit() -> None:
     global _rate_limited, _rate_limited_at
     _rate_limited = False
     _rate_limited_at = None
+
+
+def rate_limit_cooldown_remaining() -> float:
+    """Seconds remaining in the current cooldown window, or 0.0 if not limited."""
+    if not _rate_limited or _rate_limited_at is None:
+        return 0.0
+    remaining = _RATE_LIMIT_COOLDOWN_SECONDS - (time.time() - _rate_limited_at)
+    return max(0.0, remaining)
 
 
 def _cache_key(lat: float, lon: float, start_date: str, end_date: str, variables: str) -> str:
@@ -344,11 +361,15 @@ def get_api_derived_baselines(lat: float, lon: float) -> Optional[dict]:
             result_cached["_cache_meta"] = {**result_cached["_cache_meta"], "cache_hit": True}
         return result_cached
 
-    # Skip HTTP call if rate-limited this session — use cache only
-    if _rate_limited:
+    # Skip HTTP call while within the rate-limit cooldown window.
+    # Once the cooldown expires, is_rate_limited() returns False and
+    # one probe request is allowed. If it hits 429 again, _rate_limited_at
+    # is refreshed and the cooldown resets.
+    if is_rate_limited():
         logger.debug(
-            "get_api_derived_baselines: skipping API call for (%s, %s) — rate limited",
-            lat, lon,
+            "get_api_derived_baselines: skipping API call for (%s, %s) — "
+            "rate limit cooldown (%.0fs remaining)",
+            lat, lon, rate_limit_cooldown_remaining(),
         )
         return None
 

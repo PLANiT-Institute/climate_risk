@@ -616,10 +616,13 @@ def assess_physical_risk(
                     if rate_limited_now:
                         msg = (
                             f"{h['hazard_type']}: Open-Meteo 요청 제한(429) — "
-                            "정적 권역 기반 값 사용"
+                            "일시적으로 정적 권역 기반 값 사용"
                         )
                     else:
-                        msg = f"{h['hazard_type']}: API unavailable, using static_config"
+                        msg = (
+                            f"{h['hazard_type']}: API 오류 — "
+                            "일시적으로 정적 권역 기반 값 사용"
+                        )
                     api_warnings.append(msg)
                     logger.warning(
                         "assess_physical_risk: facility %s — %s",

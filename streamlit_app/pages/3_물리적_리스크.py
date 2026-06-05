@@ -5,11 +5,16 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
+
 from utils.helpers import (
     RISK_COLORS, SCENARIO_NAMES, COMPANY_NAMES_KR,
     format_currency, default_layout,
 )
 from utils.company_data import get_cached_physical, filter_physical_by_company
+from app.services.open_meteo import rate_limit_cooldown_remaining
 
 st.set_page_config(page_title="물리적 리스크", page_icon="🌊", layout="wide")
 
@@ -69,10 +74,15 @@ _api_error_hits = [
 ]
 
 if _rate_limit_hits:
+    _cooldown_secs = rate_limit_cooldown_remaining()
+    if _cooldown_secs > 0:
+        _cooldown_msg = f" 약 {int(_cooldown_secs)}초 후 자동 재시도됩니다."
+    else:
+        _cooldown_msg = " 쿨다운이 만료되었습니다 — 다음 조회 시 자동 재시도됩니다."
     st.warning(
-        f"**Open-Meteo 요청 제한(429) 발생** — "
+        f"**Open-Meteo 요청 제한(429)** — "
         f"{len({n for n, _ in _rate_limit_hits})}개 시설의 일부 hazard가 "
-        "정적 권역 기반 값으로 대체되었습니다. "
+        f"일시적으로 정적 권역 기반 값으로 대체되었습니다.{_cooldown_msg} "
         "아래 표에서 영향받은 시설과 hazard를 확인하세요.",
         icon="⚠️",
     )
@@ -87,7 +97,7 @@ if _rate_limit_hits:
 elif _api_error_hits:
     st.warning(
         f"**API 오류** — {len({n for n, _ in _api_error_hits})}개 시설의 일부 hazard가 "
-        "정적 권역 기반 값으로 대체되었습니다.",
+        "일시적으로 정적 권역 기반 값으로 대체되었습니다.",
         icon="⚠️",
     )
 
